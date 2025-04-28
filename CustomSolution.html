@@ -103,24 +103,25 @@
       height: 580px;
       background-color: #ffffff;
       border-radius: 12px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.3);
       overflow: hidden;
       display: none;
       flex-direction: column;
       z-index: 9998;
       transition: all 0.3s ease;
-      border: 1px solid #e1e5e9;
+      border: none;
     }
     
     /* Chat Header */
     .law-chat-header {
-      background-color: #1a365d;
+      background: linear-gradient(135deg, #1a365d 0%, #0d2b4e 100%);
       color: white;
       padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .law-chat-title {
@@ -129,24 +130,34 @@
       font-weight: 600;
       display: flex;
       align-items: center;
+      letter-spacing: 0.5px;
     }
     
     .law-chat-title-icon {
-      margin-right: 10px;
+      margin-right: 12px;
+      font-size: 20px;
     }
     
     .law-chat-close {
-      background: none;
+      background: rgba(255,255,255,0.1);
       border: none;
       color: white;
-      font-size: 20px;
+      font-size: 18px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      opacity: 0.8;
-      transition: opacity 0.2s;
+      opacity: 0.9;
+      transition: all 0.2s ease;
     }
     
     .law-chat-close:hover {
       opacity: 1;
+      background: rgba(255,255,255,0.2);
+      transform: rotate(90deg);
     }
     
     /* Chat Messages Area */
@@ -229,17 +240,26 @@
     .law-chat-option {
       background-color: #f0f4f8;
       border: 1px solid #c5cfd9;
-      border-radius: 18px;
+      border-radius: 20px;
       padding: 8px 16px;
       font-size: 14px;
+      font-weight: 500;
       color: #1a365d;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
     .law-chat-option:hover {
-      background-color: #dbe9ff;
-      border-color: #a3bffa;
+      background-color: #e4ecf7;
+      border-color: #1a365d;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .law-chat-option:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
     .law-chat-time {
@@ -253,16 +273,10 @@
     /* Typing Indicator */
     .law-chat-typing {
       display: none;
-      align-self: flex-start;
-      margin-bottom: 14px;
+      margin: 10px 0 14px 20px; /* Added left margin to align with other messages */
     }
     
-    .law-chat-typing .law-chat-bubble-content {
-      background-color: white;
-      color: #333;
-      border: 1px solid #e1e5e9;
-      border-bottom-left-radius: 4px;
-      padding: 12px 16px;
+    .law-chat-typing-dots {
       display: flex;
       align-items: center;
     }
@@ -272,7 +286,7 @@
       height: 8px;
       background-color: #9aa5b1;
       border-radius: 50%;
-      margin: 0 2px;
+      margin: 0 4px;
       animation: law-chat-typing 1.4s infinite ease-in-out;
     }
     
@@ -282,7 +296,7 @@
     
     @keyframes law-chat-typing {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
+      50% { transform: translateY(-4px); }
     }
     
     /* Input Area */
@@ -302,23 +316,24 @@
       font-size: 15px;
       font-family: inherit;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
       resize: none;
       overflow: hidden;
+      height: 24px; /* Exact height for a single line of text */
       max-height: 120px;
-      line-height: 1.5;
+      line-height: 24px; /* Match height for single line text */
     }
     
     .law-chat-input:focus {
-      border-color: #a3bffa;
-      box-shadow: 0 0 0 3px rgba(163, 191, 250, 0.15);
+      border-color: #1a365d;
+      box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.15);
     }
     
     .law-chat-send {
       margin-left: 10px;
       width: 44px;
       height: 44px;
-      background-color: #c41230;
+      background-color: #1a365d;
       color: white;
       border: none;
       border-radius: 50%;
@@ -326,16 +341,26 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 5px rgba(26, 54, 93, 0.2);
     }
     
     .law-chat-send:hover {
-      background-color: #a30e27;
+      background-color: #10243d;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(26, 54, 93, 0.3);
+    }
+    
+    .law-chat-send:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 3px rgba(26, 54, 93, 0.2);
     }
     
     .law-chat-send:disabled {
       background-color: #e1e5e9;
       cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
     
     .law-chat-send-icon {
@@ -388,7 +413,7 @@
   // Chat bubble
   const chatBubble = document.createElement('div');
   chatBubble.className = 'law-chat-bubble';
-  chatBubble.innerHTML = '<div class="law-chat-bubble-icon">💬</div>';
+  chatBubble.innerHTML = '<div class="law-chat-bubble-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 13.5997 2.37562 15.1116 3.04346 16.4525C3.22094 16.8088 3.28001 17.2161 3.17712 17.6006L2.58151 19.8267C2.32295 20.793 3.20701 21.677 4.17335 21.4185L6.39939 20.8229C6.78393 20.72 7.19121 20.7791 7.54753 20.9565C8.88837 21.6244 10.4003 22 12 22Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.5H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 14H13.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
   
   // Chat window
   const chatWindow = document.createElement('div');
@@ -399,8 +424,12 @@
   chatHeader.className = 'law-chat-header';
   chatHeader.innerHTML = `
     <h3 class="law-chat-title">
-      <span class="law-chat-title-icon">⚖️</span>
-      Legal Assistant
+      <span class="law-chat-title-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 1.5L1.5 6.5L12 11.5L22.5 6.5L12 1.5Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.5 17.5L12 22.5L22.5 17.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.5 12L12 17L22.5 12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></span>
+  Roth Davies Assistant
     </h3>
     <button class="law-chat-close">×</button>
   `;
@@ -413,7 +442,7 @@
   const typingIndicator = document.createElement('div');
   typingIndicator.className = 'law-chat-typing';
   typingIndicator.innerHTML = `
-    <div class="law-chat-bubble-content">
+    <div class="law-chat-typing-dots">
       <div class="law-chat-dot"></div>
       <div class="law-chat-dot"></div>
       <div class="law-chat-dot"></div>
@@ -426,7 +455,10 @@
   inputContainer.innerHTML = `
     <textarea class="law-chat-input" placeholder="Type your question here..." rows="1"></textarea>
     <button class="law-chat-send" disabled>
-      <span class="law-chat-send-icon">➤</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </button>
   `;
   
@@ -532,7 +564,6 @@
         handleVideoLoadError(messageContent, videoElement);
       }
     };
-    
     
     // Assemble the message
     messageContent.appendChild(videoElement);
@@ -666,7 +697,7 @@
       userCaseType = value;
       qualificationStage = 'caseType';
       
-      // Ask for location
+      // Ask for location with buttons
       const isKanasOrMissouri = [
         { value: 'kansas', text: 'Kansas' },
         { value: 'missouri', text: 'Missouri' },
@@ -676,15 +707,27 @@
       
     } else if (qualificationStage === 'caseType') {
       userLocation = value;
-      qualificationStage = 'qualified';
+      qualificationStage = 'location';
       
       if (value === 'kansas' || value === 'missouri') {
         // Qualified - proceed with chat
+        qualificationStage = 'qualified';
         addMessage(`Great! I'd be happy to discuss your ${userCaseType} case in ${text}. What specific questions do you have?`, false);
       } else {
         // Not qualified - provide alternate contact
-        addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false);
+        addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
+          { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
+          { value: 'no-thanks', text: 'No, thank you' }
+        ]);
       }
+    } else if (qualificationStage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
+      if (value === 'yes-referral') {
+        addMessage("Great! Please call our office at (913) 555-7890 and we'll help connect you with an attorney in your area. Is there anything else I can help with?", false);
+      } else {
+        addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
+      }
+      // Set as qualified so they can continue chatting if they want
+      qualificationStage = 'qualified';
     }
   }
   
@@ -779,9 +822,46 @@
   
   // Event listeners
   inputField.addEventListener('input', () => {
-    // Auto-resize the textarea
-    inputField.style.height = 'auto';
-    inputField.style.height = (inputField.scrollHeight < 120) ? `${inputField.scrollHeight}px` : '120px';
+    // Get a precise measurement of text width
+    const textLength = inputField.value.length;
+    
+    // Create a hidden div to measure text width accurately
+    const measureText = (text) => {
+      const hidden = document.createElement('div');
+      hidden.style.position = 'absolute';
+      hidden.style.visibility = 'hidden';
+      hidden.style.height = 'auto';
+      hidden.style.width = 'auto';
+      hidden.style.whiteSpace = 'nowrap';
+      hidden.style.fontFamily = getComputedStyle(inputField).fontFamily;
+      hidden.style.fontSize = getComputedStyle(inputField).fontSize;
+      hidden.style.padding = getComputedStyle(inputField).padding;
+      hidden.textContent = text;
+      document.body.appendChild(hidden);
+      const width = hidden.clientWidth;
+      document.body.removeChild(hidden);
+      return width;
+    };
+    
+    // Calculate available width for text (input width minus padding)
+    const inputWidth = inputField.clientWidth - (parseInt(getComputedStyle(inputField).paddingLeft) + parseInt(getComputedStyle(inputField).paddingRight));
+    
+    // Check if text would overflow a single line
+    const textWidth = measureText(inputField.value);
+    const hasLineBreaks = inputField.value.includes('\n');
+    
+    // Expand if text is wider than input or has line breaks
+    if (textWidth > inputWidth * 0.9 || hasLineBreaks) {
+      // Reset height before calculating to get accurate scrollHeight
+      inputField.style.height = '24px';
+      
+      // Calculate the content height and expand
+      const contentHeight = inputField.scrollHeight;
+      inputField.style.height = Math.min(contentHeight, 120) + 'px';
+    } else {
+      // Keep at single line height when text fits
+      inputField.style.height = '24px';
+    }
     
     // Enable/disable send button based on input
     sendButton.disabled = inputField.value.trim() === '';
@@ -792,7 +872,7 @@
     if (message) {
       addMessage(message, true);
       inputField.value = '';
-      inputField.style.height = 'auto';
+      inputField.style.height = '24px';
       sendButton.disabled = true;
       
       // Only use OpenAI if user is qualified
@@ -802,9 +882,20 @@
         
         // For demo purposes, use fallback responses instead
         processFallbackResponse(message);
-      } else {
-        // Generic response if user is trying to bypass qualification
-        addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options above.", false);
+      } else if (qualificationStage === 'initial') {
+        // If user tries to type before selecting case type, remind them and re-show options
+        addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
+          { value: 'personal-injury', text: 'Personal Injury' },
+          { value: 'criminal-defense', text: 'Criminal Defense' },
+          { value: 'divorce', text: 'Divorce' }
+        ]);
+      } else if (qualificationStage === 'caseType') {
+        // If user tries to type before selecting location, remind them and re-show options
+        addMessage("Thank you. Before we continue, please let me know if your case is in Kansas or Missouri:", false, [
+          { value: 'kansas', text: 'Kansas' },
+          { value: 'missouri', text: 'Missouri' },
+          { value: 'other', text: 'Other State' }
+        ]);
       }
     }
   });
