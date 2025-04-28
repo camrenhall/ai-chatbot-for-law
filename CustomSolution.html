@@ -299,6 +299,90 @@
       50% { transform: translateY(-4px); }
     }
     
+    /* Phone Collection Form */
+    .law-chat-phone-form {
+      margin-top: 12px;
+      width: 100%;
+    }
+    
+    .law-chat-phone-input-container {
+      display: flex;
+      align-items: center;
+      background-color: #f7f9fc;
+      border-radius: 12px;
+      padding: 8px 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 8px;
+    }
+    
+    .law-chat-phone-prefix,
+    .law-chat-phone-separator {
+      color: #4a5568;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    .law-chat-phone-input {
+      border: none;
+      background: transparent;
+      font-size: 16px;
+      padding: 4px;
+      text-align: center;
+      width: auto;
+      outline: none;
+      color: #1a365d;
+      font-weight: 500;
+    }
+    
+    .law-chat-phone-input.area-code {
+      width: 40px;
+    }
+    
+    .law-chat-phone-input.prefix {
+      width: 40px;
+    }
+    
+    .law-chat-phone-input.line {
+      width: 50px;
+    }
+    
+    .law-chat-phone-input:focus {
+      background-color: rgba(26, 54, 93, 0.05);
+      border-radius: 4px;
+    }
+    
+    .law-chat-phone-submit {
+      margin-left: auto;
+      background-color: #1a365d;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .law-chat-phone-submit:hover:not(:disabled) {
+      background-color: #12293f;
+      transform: translateY(-1px);
+    }
+    
+    .law-chat-phone-submit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    .law-chat-phone-submit:disabled {
+      background-color: #cbd5e0;
+      cursor: not-allowed;
+    }
+    
+    .law-chat-phone-privacy {
+      font-size: 11px;
+      color: #718096;
+      text-align: center;
+    }
+    
     /* Input Area */
     .law-chat-input-container {
       padding: 15px;
@@ -429,7 +513,7 @@
         <path d="M1.5 17.5L12 22.5L22.5 17.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M1.5 12L12 17L22.5 12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg></span>
-  Roth Davies Assistant
+      Legal Assistant
     </h3>
     <button class="law-chat-close">×</button>
   `;
@@ -564,6 +648,7 @@
         handleVideoLoadError(messageContent, videoElement);
       }
     };
+    
     
     // Assemble the message
     messageContent.appendChild(videoElement);
@@ -710,9 +795,111 @@
       qualificationStage = 'location';
       
       if (value === 'kansas' || value === 'missouri') {
-        // Qualified - proceed with chat
-        qualificationStage = 'qualified';
-        addMessage(`Great! I'd be happy to discuss your ${userCaseType} case in ${text}. What specific questions do you have?`, false);
+        // Qualified - proceed with phone collection
+        qualificationStage = 'phone-collection';
+        
+        // Create a phone number collection message
+        const phoneMessage = document.createElement('div');
+        phoneMessage.className = 'law-chat-message law-chat-message-bot';
+        
+        // Create phone collection form
+        const phoneContent = document.createElement('div');
+        phoneContent.className = 'law-chat-bubble-content';
+        phoneContent.innerHTML = `
+          <p>Great! I'd be happy to discuss your ${userCaseType} case in ${text}.</p>
+          <p>To connect you with the right attorney, could you provide your phone number?</p>
+          <div class="law-chat-phone-form">
+            <div class="law-chat-phone-input-container">
+              <div class="law-chat-phone-prefix">(</div>
+              <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
+              <div class="law-chat-phone-separator">)</div>
+              <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
+              <div class="law-chat-phone-separator">-</div>
+              <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
+              <button class="law-chat-phone-submit" disabled>Submit</button>
+            </div>
+            <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
+          </div>
+        `;
+        
+        // Add timestamp
+        const timeStamp = document.createElement('div');
+        timeStamp.className = 'law-chat-time';
+        timeStamp.textContent = formatTime();
+        
+        // Assemble the message
+        phoneMessage.appendChild(phoneContent);
+        phoneMessage.appendChild(timeStamp);
+        messagesContainer.appendChild(phoneMessage);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add event listeners for the phone input fields
+        setTimeout(() => {
+          const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
+          const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
+          const lineInput = document.querySelector('.law-chat-phone-input.line');
+          const submitButton = document.querySelector('.law-chat-phone-submit');
+          
+          // Auto-focus the first input
+          areaCodeInput.focus();
+          
+          // Function to validate the phone number
+          const validatePhone = () => {
+            const areaCode = areaCodeInput.value;
+            const prefix = prefixInput.value;
+            const line = lineInput.value;
+            
+            // Enable/disable submit button based on form completeness
+            submitButton.disabled = !(
+              areaCode.length === 3 && 
+              prefix.length === 3 && 
+              line.length === 4 &&
+              /^[0-9]+$/.test(areaCode) &&
+              /^[0-9]+$/.test(prefix) &&
+              /^[0-9]+$/.test(line)
+            );
+          };
+          
+          // Add input listeners to each field
+          [areaCodeInput, prefixInput, lineInput].forEach(input => {
+            // Allow only numbers
+            input.addEventListener('input', (e) => {
+              e.target.value = e.target.value.replace(/[^0-9]/g, '');
+              validatePhone();
+              
+              // Auto-advance to next field if current is full
+              if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
+                if (e.target === areaCodeInput) prefixInput.focus();
+                if (e.target === prefixInput) lineInput.focus();
+              }
+            });
+            
+            // Handle backspace to go to previous field
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Backspace' && e.target.value.length === 0) {
+                if (e.target === lineInput) prefixInput.focus();
+                if (e.target === prefixInput) areaCodeInput.focus();
+              }
+            });
+          });
+          
+          // Handle form submission
+          submitButton.addEventListener('click', () => {
+            const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
+            
+            // Send the phone number to the server
+            submitPhoneNumber(phoneNumber);
+            
+            // Add the phone number as a user message
+            addMessage(`My phone number is ${phoneNumber}`, true);
+            
+            // Update the chat stage
+            qualificationStage = 'qualified';
+            
+            // Show thank you message
+            addMessage("Thank you for providing your phone number. One of our attorneys will contact you shortly. In the meantime, what specific questions do you have about your case?", false);
+          });
+        }, 100);
       } else {
         // Not qualified - provide alternate contact
         addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
@@ -722,12 +909,116 @@
       }
     } else if (qualificationStage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
       if (value === 'yes-referral') {
-        addMessage("Great! Please call our office at (913) 555-7890 and we'll help connect you with an attorney in your area. Is there anything else I can help with?", false);
+        // Ask for phone number for referral
+        qualificationStage = 'phone-collection';
+        
+        // Create a phone number collection message for referral
+        const phoneMessage = document.createElement('div');
+        phoneMessage.className = 'law-chat-message law-chat-message-bot';
+        
+        // Create phone collection form
+        const phoneContent = document.createElement('div');
+        phoneContent.className = 'law-chat-bubble-content';
+        phoneContent.innerHTML = `
+          <p>We'd be happy to refer you to an attorney in your area.</p>
+          <p>Please provide your phone number so we can contact you:</p>
+          <div class="law-chat-phone-form">
+            <div class="law-chat-phone-input-container">
+              <div class="law-chat-phone-prefix">(</div>
+              <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
+              <div class="law-chat-phone-separator">)</div>
+              <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
+              <div class="law-chat-phone-separator">-</div>
+              <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
+              <button class="law-chat-phone-submit" disabled>Submit</button>
+            </div>
+            <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
+          </div>
+        `;
+        
+        // Add timestamp
+        const timeStamp = document.createElement('div');
+        timeStamp.className = 'law-chat-time';
+        timeStamp.textContent = formatTime();
+        
+        // Assemble the message
+        phoneMessage.appendChild(phoneContent);
+        phoneMessage.appendChild(timeStamp);
+        messagesContainer.appendChild(phoneMessage);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Add event listeners with the same phone input functionality
+        setTimeout(() => {
+          const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
+          const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
+          const lineInput = document.querySelector('.law-chat-phone-input.line');
+          const submitButton = document.querySelector('.law-chat-phone-submit');
+          
+          // Auto-focus the first input
+          areaCodeInput.focus();
+          
+          // Function to validate the phone number
+          const validatePhone = () => {
+            const areaCode = areaCodeInput.value;
+            const prefix = prefixInput.value;
+            const line = lineInput.value;
+            
+            // Enable/disable submit button based on form completeness
+            submitButton.disabled = !(
+              areaCode.length === 3 && 
+              prefix.length === 3 && 
+              line.length === 4 &&
+              /^[0-9]+$/.test(areaCode) &&
+              /^[0-9]+$/.test(prefix) &&
+              /^[0-9]+$/.test(line)
+            );
+          };
+          
+          // Add input listeners to each field
+          [areaCodeInput, prefixInput, lineInput].forEach(input => {
+            // Allow only numbers
+            input.addEventListener('input', (e) => {
+              e.target.value = e.target.value.replace(/[^0-9]/g, '');
+              validatePhone();
+              
+              // Auto-advance to next field if current is full
+              if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
+                if (e.target === areaCodeInput) prefixInput.focus();
+                if (e.target === prefixInput) lineInput.focus();
+              }
+            });
+            
+            // Handle backspace to go to previous field
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Backspace' && e.target.value.length === 0) {
+                if (e.target === lineInput) prefixInput.focus();
+                if (e.target === prefixInput) areaCodeInput.focus();
+              }
+            });
+          });
+          
+          // Handle form submission
+          submitButton.addEventListener('click', () => {
+            const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
+            
+            // Send the phone number to the server
+            submitPhoneNumber(phoneNumber, true); // true indicates this is a referral
+            
+            // Add the phone number as a user message
+            addMessage(`My phone number is ${phoneNumber}`, true);
+            
+            // Update the chat stage
+            qualificationStage = 'qualified';
+            
+            // Show thank you message
+            addMessage("Thank you! We'll have an attorney contact you soon about a referral to a lawyer in your area. Is there anything else I can help with in the meantime?", false);
+          });
+        }, 100);
       } else {
         addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
+        // Set as qualified so they can continue chatting if they want
+        qualificationStage = 'qualified';
       }
-      // Set as qualified so they can continue chatting if they want
-      qualificationStage = 'qualified';
     }
   }
   
@@ -867,6 +1158,65 @@
     sendButton.disabled = inputField.value.trim() === '';
   });
   
+  // Function to submit phone number to server
+  function submitPhoneNumber(phoneNumber, isReferral = false) {
+    console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+    
+    // This is where you would make an HTTP request to your server
+    // Example using fetch API:
+    /*
+    fetch('https://your-api-endpoint.com/submit-lead', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        caseType: userCaseType,
+        location: userLocation,
+        isReferral: isReferral,
+        timestamp: new Date().toISOString(),
+        // Add any other relevant information
+      }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Success:', data);
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+    */
+  // Removed duplicate or misplaced function definition
+    console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+    
+    // This is where you would make an HTTP request to your server
+    // Example using fetch API:
+    /*
+    fetch('https://your-api-endpoint.com/submit-lead', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        caseType: userCaseType,
+        location: userLocation,
+        isReferral: isReferral,
+        timestamp: new Date().toISOString(),
+        // Add any other relevant information
+      }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Success:', data);
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+    */
+  }
+  
   sendButton.addEventListener('click', () => {
     const message = inputField.value.trim();
     if (message) {
@@ -948,3 +1298,4 @@
 </script>
 </body>
 </html>
+  
