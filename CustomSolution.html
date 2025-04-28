@@ -100,7 +100,7 @@
       bottom: 90px;
       right: 20px;
       width: 380px;
-      height: 580px; /* Increased height to accommodate video */
+      height: 580px;
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1);
@@ -149,22 +149,6 @@
       opacity: 1;
     }
     
-    /* Video Container */
-    .law-chat-video-container {
-      width: 100%;
-      height: 180px;
-      overflow: hidden;
-      position: relative;
-      background-color: #000;
-      border-bottom: 1px solid #e1e5e9;
-    }
-    
-    .law-chat-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
     /* Chat Messages Area */
     .law-chat-messages {
       flex-grow: 1;
@@ -185,6 +169,16 @@
     .law-chat-messages::-webkit-scrollbar-thumb {
       background: #c5cfd9;
       border-radius: 3px;
+    }
+    
+    /* Video as part of a message */
+    .law-chat-video {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+      margin-bottom: 8px;
     }
     
     /* Message Bubbles */
@@ -348,6 +342,32 @@
       font-size: 18px;
     }
     
+    /* Play Button Overlay */
+    .law-chat-video-play {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+    
+    .law-chat-video-play-button {
+      width: 50px;
+      height: 50px;
+      background-color: rgba(255,255,255,0.8);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    
     /* Mobile Responsive */
     @media (max-width: 480px) {
       .law-chat-window {
@@ -356,10 +376,6 @@
         bottom: 80px;
         right: 5%;
         left: 5%;
-      }
-      
-      .law-chat-video-container {
-        height: 25vw;
       }
     }
   `;
@@ -389,19 +405,6 @@
     <button class="law-chat-close">×</button>
   `;
   
-  // Video container
-  const videoContainer = document.createElement('div');
-  videoContainer.className = 'law-chat-video-container';
-  
-  // Video element - will be populated dynamically
-  const videoElement = document.createElement('video');
-  videoElement.className = 'law-chat-video';
-  videoElement.autoplay = true;
-  videoElement.muted = true; // Muted for autoplay to work
-  videoElement.playsInline = true; // For iOS
-  videoElement.controls = false;
-  videoContainer.appendChild(videoElement);
-  
   // Chat messages container
   const messagesContainer = document.createElement('div');
   messagesContainer.className = 'law-chat-messages';
@@ -429,7 +432,6 @@
   
   // Assemble chat window
   chatWindow.appendChild(chatHeader);
-  chatWindow.appendChild(videoContainer);
   chatWindow.appendChild(messagesContainer);
   chatWindow.appendChild(typingIndicator);
   chatWindow.appendChild(inputContainer);
@@ -444,29 +446,150 @@
   const sendButton = document.querySelector('.law-chat-send');
   const closeButton = document.querySelector('.law-chat-close');
   
-  // Video sources based on page URL
-  const videoSources = {
-    'default': '/videos/welcome.mp4',
-    'personal-injury': '/videos/personal-injury.mp4',
-    'criminal-defense': '/videos/criminal-defense.mp4',
-    'divorce': '/videos/family-law.mp4'
+  // File input method for video loading
+  function createFileInput() {
+    // Create a hidden file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'law-chat-video-selector';
+    fileInput.accept = 'video/*';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    
+    return fileInput;
+  }
+  
+  // Video sources based on page path keywords
+  const videoMap = {
+    'default': 'welcome.mp4',
+    'personal-injury': 'personal-injury.mp4',
+    'criminal-defense': 'criminal-defense.mp4',
+    'divorce': 'family-law.mp4'
   };
   
+  // Create the file input for fallback method
+  const videoFileInput = createFileInput();
+  
   // Set video source based on current page
-  function setVideoSource() {
+  // Get video filename based on current page
+  function getVideoFilename() {
     const currentPath = window.location.pathname.toLowerCase();
-    let videoSrc = videoSources.default;
+    let videoFilename = videoMap.default;
     
     if (currentPath.includes('personal-injury')) {
-      videoSrc = videoSources['personal-injury'];
+      videoFilename = videoMap['personal-injury'];
     } else if (currentPath.includes('criminal') || currentPath.includes('defense')) {
-      videoSrc = videoSources['criminal-defense'];
+      videoFilename = videoMap['criminal-defense'];
     } else if (currentPath.includes('divorce') || currentPath.includes('family')) {
-      videoSrc = videoSources['divorce'];
+      videoFilename = videoMap['divorce'];
     }
     
+    return videoFilename;
+  }
+  
+  // Set video source using direct URL method first, with fallback to file input if needed
+  function createVideoMessage() {
+    const videoFilename = getVideoFilename();
+    
+    // Create the video message container
+    const videoMessage = document.createElement('div');
+    videoMessage.className = 'law-chat-message law-chat-message-bot';
+    
+    // Create the message content container
+    const messageContent = document.createElement('div');
+    messageContent.className = 'law-chat-bubble-content';
+    
+    // Create the video element
+    const videoElement = document.createElement('video');
+    videoElement.className = 'law-chat-video';
+    videoElement.controls = true;
+    videoElement.autoplay = true;
+    videoElement.muted = false; // Allow sound
+    videoElement.playsInline = true; // For iOS
+    
+    // First try with a relative path
+    const videoSrc = `videos/${videoFilename}`;
     videoElement.src = videoSrc;
-    videoElement.load();
+    
+    // Add error handling for video loading
+    videoElement.onerror = function() {
+      console.log("Error loading video with direct path, trying alternate methods...");
+      
+      // Try with a file URL as fallback (only works on some browsers)
+      if (window.location.protocol === 'file:') {
+        // For local file testing
+        const videoPath = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}`;
+        const fullPath = `${videoPath}/videos/${videoFilename}`;
+        console.log("Trying with file URL:", fullPath);
+        videoElement.src = fullPath;
+        
+        videoElement.onerror = function() {
+          // Last resort - show file input on error
+          handleVideoLoadError(messageContent, videoElement);
+        };
+      } else {
+        // Last resort - show file input on error
+        handleVideoLoadError(messageContent, videoElement);
+      }
+    };
+    
+    
+    // Assemble the message
+    messageContent.appendChild(videoElement);
+    videoMessage.appendChild(messageContent);
+    
+    // Add time stamp
+    const timeStamp = document.createElement('div');
+    timeStamp.className = 'law-chat-time';
+    timeStamp.textContent = formatTime();
+    videoMessage.appendChild(timeStamp);
+    
+    return videoMessage;
+  }
+  
+  // Handle video load error with file input fallback
+  function handleVideoLoadError(container, videoElement) {
+    // If we're here, normal loading methods failed
+    console.log("Falling back to manual file selection");
+    
+    // Remove the video element temporarily
+    if (videoElement.parentNode === container) {
+      container.removeChild(videoElement);
+    }
+    
+    // Display a message and button to select video
+    const errorMessage = document.createElement('div');
+    errorMessage.innerHTML = `
+      <p style="margin-bottom: 10px;">Unable to load the introduction video automatically.</p>
+      <button id="select-video-btn" style="padding: 8px 16px; background: #c41230; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        Select Video Manually
+      </button>
+    `;
+    container.appendChild(errorMessage);
+    
+    // Add click event to the button
+    setTimeout(() => {
+      document.getElementById('select-video-btn').addEventListener('click', function() {
+        videoFileInput.click();
+      });
+      
+      // Handle file selection
+      videoFileInput.onchange = function() {
+        if (this.files && this.files[0]) {
+          const objectURL = URL.createObjectURL(this.files[0]);
+          
+          // Remove the error message
+          container.removeChild(errorMessage);
+          
+          // Reset the video element
+          videoElement.src = objectURL;
+          container.appendChild(videoElement);
+          
+          videoElement.load();
+          videoElement.play().catch(e => console.log("Autoplay prevented:", e));
+        }
+      };
+    }, 0);
   }
   
   // OpenAI API Key - This should be replaced with a secure backend in production
@@ -479,6 +602,7 @@
   let qualificationStage = 'initial'; // Possible values: initial, caseType, location, qualified
   let userCaseType = null;
   let userLocation = null;
+  let videoAdded = false;
   
   // Utility functions
   function formatTime() {
@@ -620,68 +744,6 @@
     }
   }
   
-  // Event listeners
-  inputField.addEventListener('input', () => {
-    // Auto-resize the textarea
-    inputField.style.height = 'auto';
-    inputField.style.height = (inputField.scrollHeight < 120) ? `${inputField.scrollHeight}px` : '120px';
-    
-    // Enable/disable send button based on input
-    sendButton.disabled = inputField.value.trim() === '';
-  });
-  
-  sendButton.addEventListener('click', () => {
-    const message = inputField.value.trim();
-    if (message) {
-      addMessage(message, true);
-      inputField.value = '';
-      inputField.style.height = 'auto';
-      sendButton.disabled = true;
-      
-      // Only use OpenAI if user is qualified
-      if (qualificationStage === 'qualified') {
-        sendMessageToOpenAI(message);
-      } else {
-        // Generic response if user is trying to bypass qualification
-        addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options above.", false);
-      }
-    }
-  });
-  
-  inputField.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!sendButton.disabled) {
-        sendButton.click();
-      }
-    }
-  });
-  
-  chatBubble.addEventListener('click', () => {
-    chatWindow.style.display = 'flex';
-    chatBubble.style.display = 'none';
-    
-    // Set the video source based on current page
-    setVideoSource();
-    videoElement.play().catch(e => console.log("Autoplay prevented, user needs to interact first:", e));
-    
-    // Start qualification flow if it's the first time opening
-    if (chatHistory.length === 0) {
-      // Initial greeting and first qualification question
-      addMessage("Hello! I'm your virtual legal assistant. What type of case do you need help with?", false, [
-        { value: 'personal-injury', text: 'Personal Injury' },
-        { value: 'criminal-defense', text: 'Criminal Defense' },
-        { value: 'divorce', text: 'Divorce' }
-      ]);
-    }
-  });
-  
-  closeButton.addEventListener('click', () => {
-    chatWindow.style.display = 'none';
-    chatBubble.style.display = 'flex';
-    videoElement.pause();
-  });
-  
   // Fallback responses for offline demo (if the API key isn't provided)
   const fallbackResponses = {
     "accident": "If you've been in an accident, your health is the first priority. Seek medical attention right away, even if you feel fine - some injuries aren't immediately apparent. Then, document everything you can about the accident and call us at (913) 555-7890 for a free consultation to discuss your legal options.",
@@ -715,9 +777,16 @@
     }, 1500);
   }
   
-  // Uncomment the following code block and comment out the sendMessageToOpenAI function call
-  // in the sendButton event listener if you want to use fallback responses instead of the OpenAI API
-  /*
+  // Event listeners
+  inputField.addEventListener('input', () => {
+    // Auto-resize the textarea
+    inputField.style.height = 'auto';
+    inputField.style.height = (inputField.scrollHeight < 120) ? `${inputField.scrollHeight}px` : '120px';
+    
+    // Enable/disable send button based on input
+    sendButton.disabled = inputField.value.trim() === '';
+  });
+  
   sendButton.addEventListener('click', () => {
     const message = inputField.value.trim();
     if (message) {
@@ -726,14 +795,64 @@
       inputField.style.height = 'auto';
       sendButton.disabled = true;
       
+      // Only use OpenAI if user is qualified
       if (qualificationStage === 'qualified') {
+        // Uncomment the following line to use OpenAI API
+        // sendMessageToOpenAI(message);
+        
+        // For demo purposes, use fallback responses instead
         processFallbackResponse(message);
       } else {
+        // Generic response if user is trying to bypass qualification
         addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options above.", false);
       }
     }
   });
-  */
+  
+  inputField.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendButton.disabled) {
+        sendButton.click();
+      }
+    }
+  });
+  
+  // Play video with sound when chat window opens
+  chatBubble.addEventListener('click', () => {
+    chatWindow.style.display = 'flex';
+    chatBubble.style.display = 'none';
+    
+    // Start qualification flow if it's the first time opening
+    if (chatHistory.length === 0) {
+      // Add video message as first message if not already added
+      if (!videoAdded) {
+        // Add the video message
+        const videoMessage = createVideoMessage();
+        messagesContainer.appendChild(videoMessage);
+        videoAdded = true;
+        
+        // Wait a bit, then add the initial greeting
+        setTimeout(() => {
+          // Initial greeting and first qualification question
+          addMessage("Hello! I'm your virtual legal assistant. What type of case do you need help with?", false, [
+            { value: 'personal-injury', text: 'Personal Injury' },
+            { value: 'criminal-defense', text: 'Criminal Defense' },
+            { value: 'divorce', text: 'Divorce' }
+          ]);
+        }, 1000);
+      }
+    }
+  });
+  
+  closeButton.addEventListener('click', () => {
+    chatWindow.style.display = 'none';
+    chatBubble.style.display = 'flex';
+    
+    // Pause any videos that might be playing
+    const videos = messagesContainer.querySelectorAll('video');
+    videos.forEach(video => video.pause());
+  });
 })();
 </script>
 </body>
