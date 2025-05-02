@@ -78,6 +78,36 @@
       white-space: nowrap;
       animation: float 3s ease-in-out infinite;
     }
+
+    /* Notification Thing */
+    .law-chat-notification {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 20px;
+      height: 20px;
+      background-color: #e74c3c;
+      border-radius: 50%;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      animation: bounce 1s infinite alternate;
+      z-index: 10000;
+    }
+
+    @keyframes bounce {
+      from {
+        transform: scale(1);
+      }
+      to {
+        transform: scale(1.2);
+      }
+    }
     
     /* Floating animation for the "Text Us" label */
     @keyframes float {
@@ -498,6 +528,13 @@
   const chatBubble = document.createElement('div');
   chatBubble.className = 'law-chat-bubble';
   chatBubble.innerHTML = '<div class="law-chat-bubble-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 13.5997 2.37562 15.1116 3.04346 16.4525C3.22094 16.8088 3.28001 17.2161 3.17712 17.6006L2.58151 19.8267C2.32295 20.793 3.20701 21.677 4.17335 21.4185L6.39939 20.8229C6.78393 20.72 7.19121 20.7791 7.54753 20.9565C8.88837 21.6244 10.4003 22 12 22Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10.5H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 14H13.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+
+  // Add the notification badge
+  const notificationBadge = document.createElement('div');
+  notificationBadge.className = 'law-chat-notification';
+  notificationBadge.textContent = '1';
+  notificationBadge.style.display = 'none'; // Initially hidden
+  chatBubble.appendChild(notificationBadge);
   
   // Chat window
   const chatWindow = document.createElement('div');
@@ -513,7 +550,7 @@
         <path d="M1.5 17.5L12 22.5L22.5 17.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M1.5 12L12 17L22.5 12" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg></span>
-      Legal Assistant
+      Roth Davies Assistant
     </h3>
     <button class="law-chat-close">×</button>
   `;
@@ -662,6 +699,21 @@
     
     return videoMessage;
   }
+
+  // Notification Functions
+  function showNotification() {
+    const notificationBadge = document.querySelector('.law-chat-notification');
+    if (notificationBadge) {
+      notificationBadge.style.display = 'flex';
+    }
+  }
+
+  function hideNotification() {
+    const notificationBadge = document.querySelector('.law-chat-notification');
+    if (notificationBadge) {
+      notificationBadge.style.display = 'none';
+    }
+  }
   
   // Handle video load error with file input fallback
   function handleVideoLoadError(container, videoElement) {
@@ -711,7 +763,7 @@
   // OpenAI API Key - This should be replaced with a secure backend in production
   // IMPORTANT: Exposing API keys in frontend code is not secure for production
   // This is only for demo purposes
-  const OPENAI_API_KEY = "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";
+  const OPENAI_API_KEY = "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";
   
   // Chat flow variables
   let chatHistory = [];
@@ -1042,7 +1094,7 @@
           'Authorization': `Bearer ${OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
@@ -1228,10 +1280,10 @@
       // Only use OpenAI if user is qualified
       if (qualificationStage === 'qualified') {
         // Uncomment the following line to use OpenAI API
-        // sendMessageToOpenAI(message);
+        sendMessageToOpenAI(message);
         
         // For demo purposes, use fallback responses instead
-        processFallbackResponse(message);
+        //processFallbackResponse(message);
       } else if (qualificationStage === 'initial') {
         // If user tries to type before selecting case type, remind them and re-show options
         addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
@@ -1294,6 +1346,15 @@
     const videos = messagesContainer.querySelectorAll('video');
     videos.forEach(video => video.pause());
   });
+
+   // Add your new window.addEventListener here
+   window.addEventListener('load', () => {
+    setTimeout(() => {
+      showNotification();
+    }, 2000); // Show notification 5 seconds after page loads
+  });
+
+
 })();
 </script>
 </body>
