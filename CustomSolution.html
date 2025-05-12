@@ -1262,8 +1262,8 @@
     // Don't hide typing indicator here - it will be handled by addMessage
     addMessage(aiResponse, false);
 
-    // After adding the AI response, check for relevant content
-  if (qualificationStage === 'qualified') {
+     // After adding the AI response, check for relevant content
+    if (qualificationStage === 'qualified') {
     // Only query for recommendations after user is qualified and for certain topics
     const shouldRecommendContent = userCaseType && 
     (message.length > 10) && // Only for substantive messages
@@ -1271,19 +1271,18 @@
     !message.toLowerCase().includes("thank"); // Skip thank you messages
 
     if (shouldRecommendContent) {
-      // Context-aware search query that includes user's case type
-      const searchQuery = `${userCaseType} ${message}`; 
-      const recommendations = await queryPineconeForRelevantContent(searchQuery);
+    // Context-aware search query that includes user's case type
+    const searchQuery = `${userCaseType} ${message}`; 
+    const recommendations = await queryPineconeForRelevantContent(searchQuery);
 
-      if (recommendations.length > 0) {
-        // Short delay to make it feel natural
-        setTimeout(() => {
-          // CHANGE HERE: Use our new clean function instead
-          displayCleanRecommendations(recommendations);
-        }, 1000);
-      }
+    if (recommendations.length > 0) {
+    // Short delay to make it feel natural
+    setTimeout(() => {
+    displayContentRecommendations(recommendations);
+    }, 1000);
     }
-  }
+    }
+    }
 
   } catch (error) {
     console.error("Error calling OpenAI API:", error);
@@ -1622,8 +1621,7 @@ async function triggerRecommendations(message) {
         console.log("Found recommendations:", recommendations.length);
         // Short delay to make it feel natural
         setTimeout(() => {
-          // CHANGE HERE: Use our new clean function instead
-          displayCleanRecommendations(recommendations);
+          displayContentRecommendations(recommendations);
         }, 1000);
       } else {
         console.log("No recommendations found");
@@ -1698,6 +1696,131 @@ async function triggerRecommendations(message) {
   }
 }
 
+// Clean display function
+function displayContentRecommendations(recommendations) {
+  if (!recommendations || recommendations.length === 0) {
+    return;
+  }
+
+  // Create recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+
+  // Add heading
+  const heading = document.createElement('h4');
+  heading.textContent = 'You might find these resources helpful:';
+  recommendationsDiv.appendChild(heading);
+
+  // Add each recommendation
+  recommendations.forEach(rec => {
+    const item = document.createElement('div');
+    item.className = 'law-chat-recommendation-item';
+    
+    const title = document.createElement('a');
+    title.className = 'law-chat-recommendation-title';
+    title.href = rec.url || '#';
+    title.textContent = rec.title || 'Resource';
+    title.target = '_blank';
+    
+    const snippet = document.createElement('p');
+    snippet.className = 'law-chat-recommendation-snippet';
+    snippet.textContent = rec.snippet || 'Related information about your case.';
+    
+    item.appendChild(title);
+    item.appendChild(snippet);
+    recommendationsDiv.appendChild(item);
+  });
+
+  // Find the last bot message
+  const botMessages = document.querySelectorAll('.law-chat-message-bot');
+  if (botMessages.length === 0) {
+    return;
+  }
+  
+  const lastBotMessage = botMessages[botMessages.length - 1];
+  
+  // Add to the last bot message
+  if (lastBotMessage) {
+    const contentContainer = lastBotMessage.querySelector('.law-chat-bubble-content');
+    if (contentContainer) {
+      contentContainer.appendChild(recommendationsDiv);
+      
+      // Scroll to show recommendations
+      const messagesContainer = document.querySelector('.law-chat-messages');
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+  }
+}
+
+
+  // Function to display content recommendations in the chat
+  function displayContentRecommendations(recommendations) {
+  if (!recommendations || recommendations.length === 0) {
+    console.log("No recommendations to display");
+    return;
+  }
+  
+  console.log("Displaying recommendations:", recommendations);
+
+  // Create recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+
+  // Add heading
+  const heading = document.createElement('h4');
+  heading.textContent = 'You might find these resources helpful:';
+  recommendationsDiv.appendChild(heading);
+
+  // Add each recommendation
+  recommendations.forEach(rec => {
+    const item = document.createElement('div');
+    item.className = 'law-chat-recommendation-item';
+    
+    const title = document.createElement('a');
+    title.className = 'law-chat-recommendation-title';
+    title.href = rec.url || '#'; // Fallback URL if missing
+    title.textContent = rec.title || 'Resource'; // Fallback title if missing
+    title.target = '_blank';
+    
+    const snippet = document.createElement('p');
+    snippet.className = 'law-chat-recommendation-snippet';
+    snippet.textContent = rec.snippet || 'Related information about your case.'; // Fallback snippet if missing
+    
+    item.appendChild(title);
+    item.appendChild(snippet);
+    recommendationsDiv.appendChild(item);
+  });
+
+  // Find the last bot message
+  const botMessages = document.querySelectorAll('.law-chat-message-bot');
+  if (botMessages.length === 0) {
+    console.error("No bot messages found to append recommendations to");
+    return;
+  }
+  
+  const lastBotMessage = botMessages[botMessages.length - 1];
+  
+  // Add to the last bot message
+  if (lastBotMessage) {
+    const contentContainer = lastBotMessage.querySelector('.law-chat-bubble-content');
+    if (contentContainer) {
+      contentContainer.appendChild(recommendationsDiv);
+      
+      // Scroll to show recommendations
+      const messagesContainer = document.querySelector('.law-chat-messages');
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+      
+      console.log("Recommendations added to message");
+    } else {
+      console.error("Could not find content container in bot message");
+    }
+  }
+}
+  
   // Fallback responses for offline demo (if the API key isn't provided)
   const fallbackResponses = {
     "accident": "If you've been in an accident, your health is the first priority. Seek medical attention right away, even if you feel fine - some injuries aren't immediately apparent. Then, document everything you can about the accident and call us at (913) 451-9500 for a free consultation to discuss your legal options.",
@@ -1709,69 +1832,6 @@ async function triggerRecommendations(message) {
     "evidence": "Important evidence in personal injury cases includes medical records, accident reports, witness statements, photographs, video footage, and documentation of lost wages. The sooner you contact us, the better we can help preserve crucial evidence for your case.",
     "timeline": "Most personal injury cases resolve within 3-12 months, though complex cases can take longer. We work efficiently to reach a resolution while still pursuing maximum compensation for your injuries."
   };
-
-
-  function displayCleanRecommendations(recommendations) {
-  if (!recommendations || recommendations.length === 0) return;
-  
-  // Create recommendations container
-  const recommendationsDiv = document.createElement('div');
-  recommendationsDiv.className = 'law-chat-recommendations';
-
-  // Add heading
-  const heading = document.createElement('h4');
-  heading.textContent = 'Information we\'ve wrote about your case:';
-  recommendationsDiv.appendChild(heading);
-
-  // Create document fragment for better performance
-  const fragment = document.createDocumentFragment();
-  
-  // Process each recommendation
-  recommendations.forEach(rec => {
-    // Create the recommendation item
-    const item = document.createElement('div');
-    item.className = 'law-chat-recommendation-item';
-    
-    // Extract main title - everything before the first pipe or dash
-    let mainTitle = rec.title || 'Related Resource';
-    if (mainTitle.includes(' | ')) {
-      mainTitle = mainTitle.split(' | ')[0].trim();
-    } else if (mainTitle.includes(' - ')) {
-      mainTitle = mainTitle.split(' - ')[0].trim();
-    }
-    
-    // Create the title link with just the main title
-    const title = document.createElement('a');
-    title.className = 'law-chat-recommendation-title';
-    title.href = rec.url || '#';
-    title.textContent = mainTitle;
-    title.target = '_blank';
-    
-    // Add only the title to the item
-    item.appendChild(title);
-    fragment.appendChild(item);
-  });
-  
-  // Add all items at once
-  recommendationsDiv.appendChild(fragment);
-
-  // Find the last bot message and append recommendations
-  const botMessages = document.querySelectorAll('.law-chat-message-bot');
-  if (botMessages.length === 0) return;
-  
-  const lastBotMessage = botMessages[botMessages.length - 1];
-  const contentContainer = lastBotMessage.querySelector('.law-chat-bubble-content');
-  
-  if (contentContainer) {
-    contentContainer.appendChild(recommendationsDiv);
-    
-    // Efficiently scroll only once
-    const messagesContainer = document.querySelector('.law-chat-messages');
-    if (messagesContainer) {
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-  }
-}
   
   // Function for using fallback responses if API key isn't available
   function processFallbackResponse(message) {
