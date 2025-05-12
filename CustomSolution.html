@@ -865,94 +865,95 @@
   }
 
   // Modify your addMessage function to include delays
-  function addMessage(content, isUser, options = null) {
-    // If it's a user message, add it immediately
-    if (isUser) {
-      const messageClass = 'law-chat-message-user';
-      const messageTime = formatTime();
-      
-      const messageElement = document.createElement('div');
-      messageElement.className = `law-chat-message ${messageClass}`;
-      
-      let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
-      messageContent += `<div class="law-chat-time">${messageTime}</div>`;
-      messageElement.innerHTML = messageContent;
-      
-      messagesContainer.appendChild(messageElement);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
-      // Update chat history
+// Make sure the addMessage function also hides the typing indicator
+function addMessage(content, isUser, options = null) {
+  // If it's a user message, add it immediately
+  if (isUser) {
+    const messageClass = 'law-chat-message-user';
+    const messageTime = formatTime();
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `law-chat-message ${messageClass}`;
+    
+    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
+    messageElement.innerHTML = messageContent;
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Update chat history
+    chatHistory.push({
+      role: "user",
+      content: content
+    });
+    return;
+  }
+  
+  // For bot messages, show typing indicator and delay
+  showTypingIndicator();
+  
+  // Calculate delay - simple options vs LLM response
+  let delay;
+  if (options) {
+    // For pre-configured messages (qualification flow)
+    delay = getRandomDelay(1500, 2500);
+  } else {
+    // For LLM responses, use more sophisticated calculation
+    // apiLatency would be measured during the API call
+    // For demo purposes, we'll assume a random API latency
+    const simulatedApiLatency = apiLatency || 0;
+    delay = calculateTypingDelay(content, 2000, 5000, simulatedApiLatency);
+  }
+  
+  // Create timer for delay
+  setTimeout(() => {
+    hideTypingIndicator(); // Make sure typing indicator is hidden
+    
+    const messageClass = 'law-chat-message-bot';
+    const messageTime = formatTime();
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `law-chat-message ${messageClass}`;
+    
+    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+    
+    // Add options if provided
+    if (options) {
+      messageContent += `
+        <div class="law-chat-options">
+          ${options.map(option => `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`).join('')}
+        </div>
+      `;
+    }
+    
+    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
+    messageElement.innerHTML = messageContent;
+    
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Add click event listeners to options
+    if (options) {
+      const optionElements = messageElement.querySelectorAll('.law-chat-option');
+      optionElements.forEach(optionElement => {
+        optionElement.addEventListener('click', function() {
+          const selectedValue = this.getAttribute('data-value');
+          const selectedText = this.textContent;
+          handleOptionSelection(selectedValue, selectedText);
+        });
+      });
+    }
+    
+    // Update chat history for non-option messages
+    if (!options) {
       chatHistory.push({
-        role: "user",
+        role: "assistant",
         content: content
       });
-      return;
     }
-    
-    // For bot messages, show typing indicator and delay
-    showTypingIndicator();
-    
-    // Calculate delay - simple options vs LLM response
-    let delay;
-    if (options) {
-      // For pre-configured messages (qualification flow)
-      delay = getRandomDelay(1500, 2500);
-    } else {
-      // For LLM responses, use more sophisticated calculation
-      // apiLatency would be measured during the API call
-      // For demo purposes, we'll assume a random API latency
-      const simulatedApiLatency = apiLatency || 0;
-      delay = calculateTypingDelay(content, 2000, 5000, simulatedApiLatency);
-    }
-    
-    // Create timer for delay
-    setTimeout(() => {
-      hideTypingIndicator();
-      
-      const messageClass = 'law-chat-message-bot';
-      const messageTime = formatTime();
-      
-      const messageElement = document.createElement('div');
-      messageElement.className = `law-chat-message ${messageClass}`;
-      
-      let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
-      
-      // Add options if provided
-      if (options) {
-        messageContent += `
-          <div class="law-chat-options">
-            ${options.map(option => `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`).join('')}
-          </div>
-        `;
-      }
-      
-      messageContent += `<div class="law-chat-time">${messageTime}</div>`;
-      messageElement.innerHTML = messageContent;
-      
-      messagesContainer.appendChild(messageElement);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
-      // Add click event listeners to options
-      if (options) {
-        const optionElements = messageElement.querySelectorAll('.law-chat-option');
-        optionElements.forEach(optionElement => {
-          optionElement.addEventListener('click', function() {
-            const selectedValue = this.getAttribute('data-value');
-            const selectedText = this.textContent;
-            handleOptionSelection(selectedValue, selectedText);
-          });
-        });
-      }
-      
-      // Update chat history for non-option messages
-      if (!options) {
-        chatHistory.push({
-          role: "assistant",
-          content: content
-        });
-      }
-    }, delay);
-  }
+  }, delay);
+}
   
   function handleOptionSelection(value, text) {
     // Add the selected option as a user message
@@ -1259,39 +1260,110 @@
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
     
-    // Don't hide typing indicator here - it will be handled by addMessage
-    addMessage(aiResponse, false);
-
-     // After adding the AI response, check for relevant content
+    // Check if recommendations are needed before adding the AI response
+    let recommendations = [];
     if (qualificationStage === 'qualified') {
-    // Only query for recommendations after user is qualified and for certain topics
-    const shouldRecommendContent = userCaseType && 
-    (message.length > 10) && // Only for substantive messages
-    !message.toLowerCase().includes("hello") && // Skip greetings
-    !message.toLowerCase().includes("thank"); // Skip thank you messages
+      // Only query for recommendations after user is qualified and for certain topics
+      const shouldRecommendContent = userCaseType && 
+        (message.length > 10) && // Only for substantive messages
+        !message.toLowerCase().includes("hello") && // Skip greetings
+        !message.toLowerCase().includes("thank"); // Skip thank you messages
 
-    if (shouldRecommendContent) {
-    // Context-aware search query that includes user's case type
-    const searchQuery = `${userCaseType} ${message}`; 
-    const recommendations = await queryPineconeForRelevantContent(searchQuery);
-
-    if (recommendations.length > 0) {
-    // Short delay to make it feel natural
-    setTimeout(() => {
-    displayContentRecommendations(recommendations);
-    }, 1000);
+      if (shouldRecommendContent) {
+        try {
+          // Context-aware search query that includes user's case type
+          const searchQuery = `${userCaseType} ${message}`; 
+          recommendations = await queryPineconeForRelevantContent(searchQuery);
+        } catch (error) {
+          console.error("Error fetching recommendations:", error);
+          recommendations = [];
+        }
+      }
     }
+    
+    // Make sure typing indicator is hidden
+    hideTypingIndicator();
+    
+    // Create a complete response that includes both AI response and recommendations
+    if (recommendations && recommendations.length > 0) {
+      // Add the message with recommendations
+      addMessageWithRecommendations(aiResponse, recommendations);
+    } else {
+      // Just add the AI response without recommendations
+      addMessage(aiResponse, false);
     }
-    }
-
+    
   } catch (error) {
     console.error("Error calling OpenAI API:", error);
     apiLatency = Date.now() - startTime; // Still record latency even for errors
-    hideTypingIndicator();
+    hideTypingIndicator(); // Make sure typing indicator is hidden on error
     addMessage("I'm sorry, I'm having trouble connecting right now. Please try again or call our office directly at (913) 451-9500.", false);
   }
 }
 
+// Update the addMessageWithRecommendations function to hide the typing indicator
+function addMessageWithRecommendations(content, recommendations) {
+  // Hide typing indicator first
+  hideTypingIndicator();
+  
+  // Create the message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create the message content
+  const messageContent = document.createElement('div');
+  messageContent.className = 'law-chat-bubble-content';
+  messageContent.innerHTML = content;
+  
+  // Create the recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+  
+  // Add heading
+  const heading = document.createElement('h4');
+  heading.textContent = 'You might find these resources helpful:';
+  recommendationsDiv.appendChild(heading);
+  
+  // Add each recommendation
+  recommendations.forEach(rec => {
+    const item = document.createElement('div');
+    item.className = 'law-chat-recommendation-item';
+    
+    const title = document.createElement('a');
+    title.className = 'law-chat-recommendation-title';
+    title.href = rec.url || '#';
+    title.textContent = rec.title || 'Resource';
+    title.target = '_blank';
+    
+    const snippet = document.createElement('p');
+    snippet.className = 'law-chat-recommendation-snippet';
+    snippet.textContent = rec.snippet || 'Related information about your case.';
+    
+    item.appendChild(title);
+    item.appendChild(snippet);
+    recommendationsDiv.appendChild(item);
+  });
+  
+  // Add the recommendations before the message content
+  messageElement.appendChild(recommendationsDiv);
+  messageElement.appendChild(messageContent);
+  
+  // Add timestamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = formatTime();
+  messageElement.appendChild(timeStamp);
+  
+  // Append the message to the chat
+  messagesContainer.appendChild(messageElement);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  
+  // Update chat history
+  chatHistory.push({
+    role: "assistant",
+    content: content
+  });
+}
 // Fix 2: Fix the submitPhoneNumber function to enable the send button after phone submission
 function submitPhoneNumber(phoneNumber, isReferral = false) {
     console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
@@ -1598,40 +1670,6 @@ async function tryAlternativePineconeFormats(userMessage, queryEmbedding) {
   return [];
 }
 
-// Updated trigger function to try alternatives if main query fails
-async function triggerRecommendations(message) {
-  if (!message || !userCaseType || qualificationStage !== 'qualified') {
-    return;
-  }
-  
-  try {
-    // Only trigger for substantive messages
-    if (message.length > 10 && 
-        !message.toLowerCase().includes("hello") && 
-        !message.toLowerCase().includes("thank")) {
-      
-      // Context-aware search query that includes user's case type
-      const searchQuery = `${userCaseType} ${message}`;
-      console.log("Searching for recommendations with query:", searchQuery);
-      
-      // Get recommendations using vector embedding with dimension reduction
-      const recommendations = await queryPineconeForRelevantContent(searchQuery);
-      
-      if (recommendations && recommendations.length > 0) {
-        console.log("Found recommendations:", recommendations.length);
-        // Short delay to make it feel natural
-        setTimeout(() => {
-          displayContentRecommendations(recommendations);
-        }, 1000);
-      } else {
-        console.log("No recommendations found");
-      }
-    }
-  } catch (error) {
-    console.error("Error retrieving recommendations:", error);
-  }
-}
-
 // Store the embedding globally for reuse
 window.lastEmbedding = null;
 
@@ -1693,131 +1731,6 @@ async function triggerRecommendations(message) {
     }
   } catch (error) {
     console.error("Error retrieving recommendations");
-  }
-}
-
-// Clean display function
-function displayContentRecommendations(recommendations) {
-  if (!recommendations || recommendations.length === 0) {
-    return;
-  }
-
-  // Create recommendations container
-  const recommendationsDiv = document.createElement('div');
-  recommendationsDiv.className = 'law-chat-recommendations';
-
-  // Add heading
-  const heading = document.createElement('h4');
-  heading.textContent = 'You might find these resources helpful:';
-  recommendationsDiv.appendChild(heading);
-
-  // Add each recommendation
-  recommendations.forEach(rec => {
-    const item = document.createElement('div');
-    item.className = 'law-chat-recommendation-item';
-    
-    const title = document.createElement('a');
-    title.className = 'law-chat-recommendation-title';
-    title.href = rec.url || '#';
-    title.textContent = rec.title || 'Resource';
-    title.target = '_blank';
-    
-    const snippet = document.createElement('p');
-    snippet.className = 'law-chat-recommendation-snippet';
-    snippet.textContent = rec.snippet || 'Related information about your case.';
-    
-    item.appendChild(title);
-    item.appendChild(snippet);
-    recommendationsDiv.appendChild(item);
-  });
-
-  // Find the last bot message
-  const botMessages = document.querySelectorAll('.law-chat-message-bot');
-  if (botMessages.length === 0) {
-    return;
-  }
-  
-  const lastBotMessage = botMessages[botMessages.length - 1];
-  
-  // Add to the last bot message
-  if (lastBotMessage) {
-    const contentContainer = lastBotMessage.querySelector('.law-chat-bubble-content');
-    if (contentContainer) {
-      contentContainer.appendChild(recommendationsDiv);
-      
-      // Scroll to show recommendations
-      const messagesContainer = document.querySelector('.law-chat-messages');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
-    }
-  }
-}
-
-
-  // Function to display content recommendations in the chat
-  function displayContentRecommendations(recommendations) {
-  if (!recommendations || recommendations.length === 0) {
-    console.log("No recommendations to display");
-    return;
-  }
-  
-  console.log("Displaying recommendations:", recommendations);
-
-  // Create recommendations container
-  const recommendationsDiv = document.createElement('div');
-  recommendationsDiv.className = 'law-chat-recommendations';
-
-  // Add heading
-  const heading = document.createElement('h4');
-  heading.textContent = 'You might find these resources helpful:';
-  recommendationsDiv.appendChild(heading);
-
-  // Add each recommendation
-  recommendations.forEach(rec => {
-    const item = document.createElement('div');
-    item.className = 'law-chat-recommendation-item';
-    
-    const title = document.createElement('a');
-    title.className = 'law-chat-recommendation-title';
-    title.href = rec.url || '#'; // Fallback URL if missing
-    title.textContent = rec.title || 'Resource'; // Fallback title if missing
-    title.target = '_blank';
-    
-    const snippet = document.createElement('p');
-    snippet.className = 'law-chat-recommendation-snippet';
-    snippet.textContent = rec.snippet || 'Related information about your case.'; // Fallback snippet if missing
-    
-    item.appendChild(title);
-    item.appendChild(snippet);
-    recommendationsDiv.appendChild(item);
-  });
-
-  // Find the last bot message
-  const botMessages = document.querySelectorAll('.law-chat-message-bot');
-  if (botMessages.length === 0) {
-    console.error("No bot messages found to append recommendations to");
-    return;
-  }
-  
-  const lastBotMessage = botMessages[botMessages.length - 1];
-  
-  // Add to the last bot message
-  if (lastBotMessage) {
-    const contentContainer = lastBotMessage.querySelector('.law-chat-bubble-content');
-    if (contentContainer) {
-      contentContainer.appendChild(recommendationsDiv);
-      
-      // Scroll to show recommendations
-      const messagesContainer = document.querySelector('.law-chat-messages');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
-      
-      console.log("Recommendations added to message");
-    } else {
-      console.error("Could not find content container in bot message");
-    }
   }
 }
   
@@ -1930,9 +1843,6 @@ function displayContentRecommendations(recommendations) {
   sendButton.addEventListener('click', () => {
   const message = inputField.value.trim();
   if (message) {
-    // Store message before clearing input
-    const userQuery = message;
-    
     addMessage(message, true);
     inputField.value = '';
     inputField.style.height = '24px';
@@ -1940,14 +1850,13 @@ function displayContentRecommendations(recommendations) {
     
     // Only use OpenAI if user is qualified
     if (qualificationStage === 'qualified') {
-      // Send to OpenAI
+      // Send to OpenAI - recommendations will be handled inside this function now
       sendMessageToOpenAI(message);
       
-      // Trigger recommendations separately to ensure they work
-      // regardless of the AI response
-      setTimeout(() => {
-        triggerRecommendations(userQuery);
-      }, 500);
+      // Remove this duplicate call to triggerRecommendations
+      // setTimeout(() => {
+      //   triggerRecommendations(userQuery);
+      // }, 500);
     } else if (qualificationStage === 'initial') {
       // If user tries to type before selecting case type, remind them and re-show options
       addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
