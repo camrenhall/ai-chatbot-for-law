@@ -448,6 +448,63 @@
           background: #c5cfd9;
           border-radius: 3px;
         }
+
+        /* Name Input Form */
+        .law-chat-name-form {
+          margin-top: 12px;
+          width: 100%;
+        }
+
+        .law-chat-name-input-container {
+          display: flex;
+          align-items: center;
+          background-color: #f7f9fc;
+          border-radius: 12px;
+          padding: 8px 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          margin-bottom: 8px;
+        }
+
+        .law-chat-name-input {
+          flex-grow: 1;
+          border: none;
+          background: transparent;
+          font-size: 16px;
+          padding: 8px;
+          outline: none;
+          color: #1a365d;
+        }
+
+        .law-chat-name-input:focus {
+          background-color: rgba(26, 54, 93, 0.05);
+          border-radius: 4px;
+        }
+
+        .law-chat-name-submit {
+          margin-left: auto;
+          background-color: #1a365d;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 6px 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .law-chat-name-submit:hover:not(:disabled) {
+          background-color: #12293f;
+          transform: translateY(-1px);
+        }
+
+        .law-chat-name-submit:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .law-chat-name-submit:disabled {
+          background-color: #cbd5e0;
+          cursor: not-allowed;
+        }
         
         /* Video as part of a message */
         .law-chat-video {
@@ -1245,6 +1302,106 @@
       
       // No need to update chat history for recommendations-only
     },
+
+    // Add to Messages module
+    addDisclaimerMessage() {
+      const message = "Utilizing this chat service does not create an attorney-client relationship. Any information communicated in this chat is not legal advice. Some of the responses may utilize AI based on the content of our website. Do you agree?";
+      
+      Messages.addMessage(message, false, [
+        { value: 'agree', text: 'I Agree' },
+        { value: 'decline', text: 'I Do Not Agree' }
+      ]);
+    },
+
+    createNameInputForm(isReferral = false) {
+      // Create the message
+      const nameMessage = document.createElement('div');
+      nameMessage.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create content
+      const nameContent = document.createElement('div');
+      nameContent.className = 'law-chat-bubble-content';
+      
+      // Different text based on if it's a referral
+      if (isReferral) {
+        nameContent.innerHTML = `
+          <p>We'd be happy to refer you to an attorney in your area.</p>
+          <p>First, could you please tell me your name?</p>
+        `;
+      } else {
+        nameContent.innerHTML = `
+          <p>Great! I'd be happy to discuss your ${ChatFlow.userCaseType} case in ${ChatFlow.getLocationDisplay()}.</p>
+          <p>First, could you please tell me your name?</p>
+        `;
+      }
+      
+      // Add name form
+      const nameForm = document.createElement('div');
+      nameForm.className = 'law-chat-name-form';
+      nameForm.innerHTML = `
+        <div class="law-chat-name-input-container">
+          <input type="text" class="law-chat-name-input" placeholder="Your name">
+          <button class="law-chat-name-submit" disabled>Submit</button>
+        </div>
+      `;
+      
+      nameContent.appendChild(nameForm);
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = UI.formatTime();
+      
+      // Assemble everything
+      nameMessage.appendChild(nameContent);
+      nameMessage.appendChild(timeStamp);
+      
+      DOM.elements.messages.appendChild(nameMessage);
+      DOM.scrollToBottom();
+      
+      // Add event listeners for the name input
+      setTimeout(() => {
+        // Get name input field and submit button
+        const nameInput = document.querySelector('.law-chat-name-input');
+        const submitButton = document.querySelector('.law-chat-name-submit');
+        
+        // Focus input
+        nameInput.focus();
+        
+        // Validate input function
+        const validateName = () => {
+          submitButton.disabled = nameInput.value.trim().length === 0;
+        };
+        
+        // Add input handler
+        nameInput.addEventListener('input', validateName);
+        
+        // Handle enter key press
+        nameInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !submitButton.disabled) {
+            submitButton.click();
+          }
+        });
+        
+        // Handle form submission
+        submitButton.addEventListener('click', () => {
+          const name = nameInput.value.trim();
+          
+          // Store name
+          ChatFlow.userName = name;
+          
+          // Add as user message
+          this.addMessage(`My name is ${name}`, true);
+          
+          // Update flow state to phone collection
+          ChatFlow.stage = 'phone-collection';
+          
+          // Show phone collection form
+          const isReferral = ChatFlow.userLocation === 'other';
+          this.createPhoneInputForm(isReferral);
+        });
+      }, 100);
+    },
     
     // Creates phone input form
     createPhoneInputForm(isReferral = false) {
@@ -1351,6 +1508,7 @@
         });
         
         // Handle form submission
+        // Inside the createPhoneInputForm method, modify the submit button event listener:
         submitButton.addEventListener('click', () => {
           const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
           
@@ -1360,15 +1518,11 @@
           // Add as user message
           this.addMessage(`My phone number is ${phoneNumber}`, true);
           
-          // Update flow state
-          ChatFlow.stage = 'qualified';
+          // Update flow state to show disclaimer instead of setting as qualified
+          ChatFlow.stage = 'disclaimer';
           
-          // Show thank you message
-          if (isReferral) {
-            this.addMessage("Thank you! We'll have an attorney contact you soon about a referral to a lawyer in your area. Is there anything else I can help with in the meantime?", false);
-          } else {
-            this.addMessage("Thank you for that. Could you tell me a little bit about your case?", false);
-          }
+          // Show disclaimer message
+          this.addDisclaimerMessage();
           
           // Ensure send button is enabled
           setTimeout(() => {
@@ -1384,6 +1538,7 @@
     stage: 'initial', // initial, caseType, location, phone-collection, qualified
     userCaseType: null,
     userLocation: null,
+    userName: null,
     history: [],
     
     // Process user's direct text input
@@ -1436,9 +1591,9 @@
         this.stage = 'location';
         
         if (value === 'kansas' || value === 'missouri') {
-          // Qualified - proceed with phone collection
-          this.stage = 'phone-collection';
-          Messages.createPhoneInputForm(false);
+          // Ask for name first
+          this.stage = 'name-collection';
+          Messages.createNameInputForm();
         } else {
           // Not qualified - provide referral option
           Messages.addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
@@ -1448,18 +1603,29 @@
         }
       } else if (this.stage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
         if (value === 'yes-referral') {
-          // Ask for phone for referral
-          this.stage = 'phone-collection';
-          Messages.createPhoneInputForm(true);
+          // Ask for name first
+          this.stage = 'name-collection';
+          Messages.createNameInputForm(true);
         } else {
           Messages.addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
           // Set as qualified so they can chat if they want
           this.stage = 'qualified';
         }
+      } else if (this.stage === 'disclaimer') {
+        if (value === 'agree') {
+          // User agreed to disclaimer, now they're qualified
+          this.stage = 'qualified';
+          Messages.addMessage("Thank you for agreeing. Could you tell me a little bit about your case?", false);
+        } else {
+          // User did not agree
+          Messages.addMessage("I understand. Without your agreement, we cannot continue the consultation. If you change your mind or have other questions, please feel free to chat with us again.", false);
+          // Leave at disclaimer stage
+        }
       }
     },
     
     // Create a natural-sounding message based on option selection
+    // Add this to the createNaturalResponse method in ChatFlow
     createNaturalResponse(value, text) {
       if (this.stage === 'initial') {
         return `I need help with a ${text} case.`;
@@ -1470,6 +1636,12 @@
           return "Yes, I'd like to get a referral to an attorney in my area.";
         } else {
           return "No thanks, I don't need a referral at this time.";
+        }
+      } else if (this.stage === 'disclaimer') {
+        if (value === 'agree') {
+          return "I agree to the terms.";
+        } else {
+          return "I do not agree.";
         }
       }
       
