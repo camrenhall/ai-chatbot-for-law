@@ -158,27 +158,56 @@
     },
     
     cacheElements() {
-      // Save references to frequently accessed elements for better performance
-      const selectors = Config.cssSelector;
-      this.elements = {
-        container: document.querySelector(selectors.container),
-        messages: document.querySelector(selectors.messages),
-        input: document.querySelector(selectors.input),
-        send: document.querySelector(selectors.send),
-        bubble: document.querySelector(selectors.bubble),
-        window: document.querySelector(selectors.window),
-        close: document.querySelector(selectors.close),
-        typing: document.querySelector(selectors.typing),
-        notification: document.querySelector(selectors.notification)
-      };
-      
-      // Auto-resize textarea as user types
-      this.elements.input.addEventListener('input', () => {
-        this.elements.input.style.height = 'auto';
-        const newHeight = Math.min(120, Math.max(24, this.elements.input.scrollHeight));
-        this.elements.input.style.height = `${newHeight}px`;
-      });
-    },
+  // Save references to frequently accessed elements for better performance
+  const selectors = Config.cssSelector;
+  this.elements = {
+    container: document.querySelector(selectors.container),
+    messages: document.querySelector(selectors.messages),
+    input: document.querySelector(selectors.input),
+    send: document.querySelector(selectors.send),
+    bubble: document.querySelector(selectors.bubble),
+    window: document.querySelector(selectors.window),
+    close: document.querySelector(selectors.close),
+    typing: document.querySelector(selectors.typing),
+    notification: document.querySelector(selectors.notification)
+  };
+  
+  // Improved auto-resize textarea functionality
+  this.elements.input.addEventListener('input', () => {
+    // Store the current scroll height
+    const previousScrollHeight = this.elements.input.scrollHeight;
+    
+    // Reset height to auto so we can accurately determine needed height
+    this.elements.input.style.height = 'auto';
+    
+    // Calculate the number of characters per line (approximation)
+    const inputWidth = this.elements.input.clientWidth;
+    const avgCharWidth = 8; // Average character width in pixels (approximate)
+    const charsPerLine = Math.floor(inputWidth / avgCharWidth) * 0.95; // 95% of total width
+    
+    // Only expand if text would wrap to next line
+    const text = this.elements.input.value;
+    const needsExpansion = text.length > charsPerLine || text.includes('\n');
+    
+    // Calculate the appropriate height
+    let newHeight;
+    if (needsExpansion) {
+      // Set height based on scrollHeight but with limits
+      newHeight = Math.min(120, Math.max(24, this.elements.input.scrollHeight));
+    } else {
+      // Keep single line height
+      newHeight = 24;
+    }
+    
+    // Apply the new height
+    this.elements.input.style.height = `${newHeight}px`;
+    
+    // If height increased, scroll to bottom of messages
+    if (newHeight > previousScrollHeight) {
+      this.scrollToBottom();
+    }
+  });
+},
     
     setupEventListeners() {
       // Chat toggle event listeners
@@ -767,6 +796,9 @@
           height: 24px; /* Exact height for a single line of text */
           max-height: 120px;
           line-height: 24px; /* Match height for single line text */
+          white-space: pre-wrap; /* Preserve whitespace but allow wrapping */
+          word-break: break-word; /* Break long words if needed */
+          box-sizing: content-box; /* Make sure padding doesn't affect height calculation */
         }
         
         .law-chat-input:focus {
@@ -1521,6 +1553,7 @@
         
         // Handle form submission
         // Update the name input form submission handler
+      // Update in the createNameInputForm method
       submitButton.addEventListener('click', () => {
         const name = nameInput.value.trim();
         
@@ -1539,15 +1572,27 @@
         // Update flow state to phone collection
         ChatFlow.stage = 'phone-collection';
         
-        // Show phone collection form
-        const isReferral = ChatFlow.userLocation === 'other';
-        this.createPhoneInputForm(isReferral);
+        // Show typing indicator before showing phone form
+        UI.showTypingIndicator();
+        
+        // Use setTimeout to simulate typing delay
+        setTimeout(() => {
+          // Hide typing indicator
+          UI.hideTypingIndicator();
+          
+          // Show phone collection form
+          const isReferral = ChatFlow.userLocation === 'other';
+          this.createPhoneInputForm(isReferral);
+        }, UI.getRandomDelay()); // Use a random delay from the UI module for consistency
       });
       }, 100);
     },
     
     // Creates phone input form
     createPhoneInputForm(isReferral = false) {
+      // Make sure typing indicator is hidden before creating the form
+      UI.hideTypingIndicator();
+
       // Create the message
       const phoneMessage = document.createElement('div');
       phoneMessage.className = 'law-chat-message law-chat-message-bot';
@@ -1653,6 +1698,7 @@
         // Handle form submission
         // Inside the createPhoneInputForm method, modify the submit button event listener:
         // Update the phone form submission handler
+        // Update in the createPhoneInputForm method, in the submit button event listener
         submitButton.addEventListener('click', () => {
           const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
           
@@ -1670,11 +1716,20 @@
           // Add as user message
           this.addMessage(`My phone number is ${phoneNumber}`, true);
           
-          // Update flow state to show disclaimer instead of setting as qualified
+          // Update flow state to show disclaimer
           ChatFlow.stage = 'disclaimer';
           
-          // Show disclaimer message
-          this.addDisclaimerMessage();
+          // Show typing indicator before showing disclaimer
+          UI.showTypingIndicator();
+          
+          // Use setTimeout to simulate typing delay
+          setTimeout(() => {
+            // Hide typing indicator
+            UI.hideTypingIndicator();
+            
+            // Show disclaimer message
+            this.addDisclaimerMessage();
+          }, UI.getRandomDelay()); // Use a random delay from the UI module
           
           // Ensure send button is enabled
           setTimeout(() => {
@@ -1771,12 +1826,23 @@
         this.userLocation = value;
         this.stage = 'location';
         
-        if (value === 'kansas' || value === 'missouri') {
-          // Ask for name first
+        if (value === 'kansas') {
+          // Kansas handles all case types
           this.stage = 'name-collection';
           Messages.createNameInputForm();
+        } else if (value === 'missouri' && this.userCaseType === 'personal-injury') {
+          // Missouri only handles personal injury cases
+          this.stage = 'name-collection';
+          Messages.createNameInputForm();
+        } else if (value === 'missouri' && 
+                  (this.userCaseType === 'criminal-defense' || this.userCaseType === 'divorce')) {
+          // Not qualified for Missouri criminal defense or divorce
+          Messages.addMessage(`I'm sorry, but our firm only handles ${this.getCaseTypeDisplay()} cases in Kansas, not Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in Missouri?`, false, [
+            { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
+            { value: 'no-thanks', text: 'No, thank you' }
+          ]);
         } else {
-          // Not qualified - provide referral option
+          // Not qualified - in a state other than KS or MO
           Messages.addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
             { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
             { value: 'no-thanks', text: 'No, thank you' }
