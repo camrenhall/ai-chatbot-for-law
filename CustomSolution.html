@@ -704,63 +704,65 @@
   
   // Set video source using direct URL method first, with fallback to file input if needed
   function createVideoMessage() {
-    const videoFilename = getVideoFilename();
+  const videoFilename = getVideoFilename();
+  
+  // Create the video message container
+  const videoMessage = document.createElement('div');
+  videoMessage.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create the message content container
+  const messageContent = document.createElement('div');
+  messageContent.className = 'law-chat-bubble-content';
+  
+  // Create the video element
+  const videoElement = document.createElement('video');
+  videoElement.className = 'law-chat-video';
+  videoElement.controls = true;
+  videoElement.autoplay = true;
+  videoElement.muted = false; // Allow sound
+  videoElement.playsInline = true; // For iOS
+  
+  // First try with a relative path
+  const videoSrc = `videos/${videoFilename}`;
+  videoElement.src = videoSrc;
+  
+  // Set up the event listener for video completion
+  addInitialMessageAfterVideo(videoElement);
+  
+  // Add error handling for video loading
+  videoElement.onerror = function() {
+    console.log("Error loading video with direct path, trying alternate methods...");
     
-    // Create the video message container
-    const videoMessage = document.createElement('div');
-    videoMessage.className = 'law-chat-message law-chat-message-bot';
-    
-    // Create the message content container
-    const messageContent = document.createElement('div');
-    messageContent.className = 'law-chat-bubble-content';
-    
-    // Create the video element
-    const videoElement = document.createElement('video');
-    videoElement.className = 'law-chat-video';
-    videoElement.controls = true;
-    videoElement.autoplay = true;
-    videoElement.muted = false; // Allow sound
-    videoElement.playsInline = true; // For iOS
-    
-    // First try with a relative path
-    const videoSrc = `videos/${videoFilename}`;
-    videoElement.src = videoSrc;
-    
-    // Add error handling for video loading
-    videoElement.onerror = function() {
-      console.log("Error loading video with direct path, trying alternate methods...");
+    // Try with a file URL as fallback (only works on some browsers)
+    if (window.location.protocol === 'file:') {
+      // For local file testing
+      const videoPath = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}`;
+      const fullPath = `${videoPath}/videos/${videoFilename}`;
+      console.log("Trying with file URL:", fullPath);
+      videoElement.src = fullPath;
       
-      // Try with a file URL as fallback (only works on some browsers)
-      if (window.location.protocol === 'file:') {
-        // For local file testing
-        const videoPath = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}`;
-        const fullPath = `${videoPath}/videos/${videoFilename}`;
-        console.log("Trying with file URL:", fullPath);
-        videoElement.src = fullPath;
-        
-        videoElement.onerror = function() {
-          // Last resort - show file input on error
-          handleVideoLoadError(messageContent, videoElement);
-        };
-      } else {
+      videoElement.onerror = function() {
         // Last resort - show file input on error
         handleVideoLoadError(messageContent, videoElement);
-      }
-    };
-    
-    
-    // Assemble the message
-    messageContent.appendChild(videoElement);
-    videoMessage.appendChild(messageContent);
-    
-    // Add time stamp
-    const timeStamp = document.createElement('div');
-    timeStamp.className = 'law-chat-time';
-    timeStamp.textContent = formatTime();
-    videoMessage.appendChild(timeStamp);
-    
-    return videoMessage;
-  }
+      };
+    } else {
+      // Last resort - show file input on error
+      handleVideoLoadError(messageContent, videoElement);
+    }
+  };
+  
+  // Assemble the message
+  messageContent.appendChild(videoElement);
+  videoMessage.appendChild(messageContent);
+  
+  // Add time stamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = formatTime();
+  videoMessage.appendChild(timeStamp);
+  
+  return videoMessage;
+}
 
   // Notification Functions
   function showNotification() {
@@ -779,48 +781,67 @@
   
   // Handle video load error with file input fallback
   function handleVideoLoadError(container, videoElement) {
-    // If we're here, normal loading methods failed
-    console.log("Falling back to manual file selection");
-    
-    // Remove the video element temporarily
-    if (videoElement.parentNode === container) {
-      container.removeChild(videoElement);
-    }
-    
-    // Display a message and button to select video
-    const errorMessage = document.createElement('div');
-    errorMessage.innerHTML = `
-      <p style="margin-bottom: 10px;">Unable to load the introduction video automatically.</p>
-      <button id="select-video-btn" style="padding: 8px 16px; background: #c41230; color: white; border: none; border-radius: 4px; cursor: pointer;">
-        Select Video Manually
-      </button>
-    `;
-    container.appendChild(errorMessage);
-    
-    // Add click event to the button
-    setTimeout(() => {
-      document.getElementById('select-video-btn').addEventListener('click', function() {
-        videoFileInput.click();
-      });
-      
-      // Handle file selection
-      videoFileInput.onchange = function() {
-        if (this.files && this.files[0]) {
-          const objectURL = URL.createObjectURL(this.files[0]);
-          
-          // Remove the error message
-          container.removeChild(errorMessage);
-          
-          // Reset the video element
-          videoElement.src = objectURL;
-          container.appendChild(videoElement);
-          
-          videoElement.load();
-          videoElement.play().catch(e => console.log("Autoplay prevented:", e));
-        }
-      };
-    }, 0);
+  // If we're here, normal loading methods failed
+  console.log("Falling back to manual file selection");
+  
+  // Remove the video element temporarily
+  if (videoElement.parentNode === container) {
+    container.removeChild(videoElement);
   }
+  
+  // Display a message and button to select video
+  const errorMessage = document.createElement('div');
+  errorMessage.innerHTML = `
+    <p style="margin-bottom: 10px;">Unable to load the introduction video automatically.</p>
+    <button id="select-video-btn" style="padding: 8px 16px; background: #c41230; color: white; border: none; border-radius: 4px; cursor: pointer;">
+      Select Video Manually
+    </button>
+  `;
+  container.appendChild(errorMessage);
+  
+  // Add click event to the button
+  setTimeout(() => {
+    document.getElementById('select-video-btn').addEventListener('click', function() {
+      videoFileInput.click();
+    });
+    
+    // Handle file selection
+    videoFileInput.onchange = function() {
+      if (this.files && this.files[0]) {
+        const objectURL = URL.createObjectURL(this.files[0]);
+        
+        // Remove the error message
+        container.removeChild(errorMessage);
+        
+        // Reset the video element
+        videoElement.src = objectURL;
+        container.appendChild(videoElement);
+        
+        // Reattach the video ended event listener
+        addInitialMessageAfterVideo(videoElement);
+        
+        videoElement.load();
+        videoElement.play().catch(e => console.log("Autoplay prevented:", e));
+      }
+    };
+    
+    // If video selection fails, show the message after a timeout
+    setTimeout(() => {
+      if (!videoElement.parentNode) {
+        showTypingIndicator();
+        
+        setTimeout(() => {
+          hideTypingIndicator();
+          addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
+            { value: 'personal-injury', text: 'Personal Injury' },
+            { value: 'criminal-defense', text: 'Criminal Defense' },
+            { value: 'divorce', text: 'Divorce' }
+          ]);
+        }, getRandomDelay(1500, 2500));
+      }
+    }, 10000); // Wait 10 seconds for user to select a video
+  }, 0);
+}
   
   // OpenAI API Key - This should be replaced with a secure backend in production
   // IMPORTANT: Exposing API keys in frontend code is not secure for production
@@ -866,6 +887,7 @@
 
   // Modify your addMessage function to include delays
 // Make sure the addMessage function also hides the typing indicator
+// Make sure the addMessage function is working correctly
 function addMessage(content, isUser, options = null) {
   // If it's a user message, add it immediately
   if (isUser) {
@@ -900,8 +922,6 @@ function addMessage(content, isUser, options = null) {
     delay = getRandomDelay(1500, 2500);
   } else {
     // For LLM responses, use more sophisticated calculation
-    // apiLatency would be measured during the API call
-    // For demo purposes, we'll assume a random API latency
     const simulatedApiLatency = apiLatency || 0;
     delay = calculateTypingDelay(content, 2000, 5000, simulatedApiLatency);
   }
@@ -955,254 +975,303 @@ function addMessage(content, isUser, options = null) {
   }, delay);
 }
   
-  function handleOptionSelection(value, text) {
-    // Add the selected option as a user message
-    addMessage(text, true);
-    
-    // Handle the qualification flow
-    if (qualificationStage === 'initial') {
-      userCaseType = value;
-      qualificationStage = 'caseType';
-      
-      // Ask for location with buttons
-      const isKanasOrMissouri = [
-        { value: 'kansas', text: 'Kansas' },
-        { value: 'missouri', text: 'Missouri' },
-        { value: 'other', text: 'Other State' }
-      ];
-      addMessage("Thank you. Is your case in Kansas or Missouri?", false, isKanasOrMissouri);
-      
-    } else if (qualificationStage === 'caseType') {
-      userLocation = value;
-      qualificationStage = 'location';
-      
-      if (value === 'kansas' || value === 'missouri') {
-        // Qualified - proceed with phone collection
-        qualificationStage = 'phone-collection';
-        
-        // Create a phone number collection message
-        const phoneMessage = document.createElement('div');
-        phoneMessage.className = 'law-chat-message law-chat-message-bot';
-        
-        // Create phone collection form
-        const phoneContent = document.createElement('div');
-        phoneContent.className = 'law-chat-bubble-content';
-        phoneContent.innerHTML = `
-          <p>Great! I'd be happy to discuss your ${userCaseType} case in ${text}.</p>
-          <p>To connect you with the right attorney, could you provide your phone number?</p>
-          <div class="law-chat-phone-form">
-            <div class="law-chat-phone-input-container">
-              <div class="law-chat-phone-prefix">(</div>
-              <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
-              <div class="law-chat-phone-separator">)</div>
-              <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
-              <div class="law-chat-phone-separator">-</div>
-              <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
-              <button class="law-chat-phone-submit" disabled>Submit</button>
-            </div>
-            <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
-          </div>
-        `;
-        
-        // Add timestamp
-        const timeStamp = document.createElement('div');
-        timeStamp.className = 'law-chat-time';
-        timeStamp.textContent = formatTime();
-        
-        // Assemble the message
-        phoneMessage.appendChild(phoneContent);
-        phoneMessage.appendChild(timeStamp);
-        messagesContainer.appendChild(phoneMessage);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Add event listeners for the phone input fields
-        setTimeout(() => {
-          const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
-          const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
-          const lineInput = document.querySelector('.law-chat-phone-input.line');
-          const submitButton = document.querySelector('.law-chat-phone-submit');
-          
-          // Auto-focus the first input
-          areaCodeInput.focus();
-          
-          // Function to validate the phone number
-          const validatePhone = () => {
-            const areaCode = areaCodeInput.value;
-            const prefix = prefixInput.value;
-            const line = lineInput.value;
-            
-            // Enable/disable submit button based on form completeness
-            submitButton.disabled = !(
-              areaCode.length === 3 && 
-              prefix.length === 3 && 
-              line.length === 4 &&
-              /^[0-9]+$/.test(areaCode) &&
-              /^[0-9]+$/.test(prefix) &&
-              /^[0-9]+$/.test(line)
-            );
-          };
-          
-          // Add input listeners to each field
-          [areaCodeInput, prefixInput, lineInput].forEach(input => {
-            // Allow only numbers
-            input.addEventListener('input', (e) => {
-              e.target.value = e.target.value.replace(/[^0-9]/g, '');
-              validatePhone();
-              
-              // Auto-advance to next field if current is full
-              if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
-                if (e.target === areaCodeInput) prefixInput.focus();
-                if (e.target === prefixInput) lineInput.focus();
-              }
-            });
-            
-            // Handle backspace to go to previous field
-            input.addEventListener('keydown', (e) => {
-              if (e.key === 'Backspace' && e.target.value.length === 0) {
-                if (e.target === lineInput) prefixInput.focus();
-                if (e.target === prefixInput) areaCodeInput.focus();
-              }
-            });
-          });
-          
-          // Handle form submission
-          submitButton.addEventListener('click', () => {
-            const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
-            
-            // Send the phone number to the server
-            submitPhoneNumber(phoneNumber);
-            
-            // Add the phone number as a user message
-            addMessage(`My phone number is ${phoneNumber}`, true);
-            
-            // Update the chat stage
-            qualificationStage = 'qualified';
-            
-            // Show thank you message
-            addMessage("Thank you for for that. Could you tell me a little bit about your case?", false);
-          });
-        }, 100);
-      } else {
-        // Not qualified - provide alternate contact
-        addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
-          { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
-          { value: 'no-thanks', text: 'No, thank you' }
-        ]);
-      }
-    } else if (qualificationStage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
-      if (value === 'yes-referral') {
-        // Ask for phone number for referral
-        qualificationStage = 'phone-collection';
-        
-        // Create a phone number collection message for referral
-        const phoneMessage = document.createElement('div');
-        phoneMessage.className = 'law-chat-message law-chat-message-bot';
-        
-        // Create phone collection form
-        const phoneContent = document.createElement('div');
-        phoneContent.className = 'law-chat-bubble-content';
-        phoneContent.innerHTML = `
-          <p>We'd be happy to refer you to an attorney in your area.</p>
-          <p>Please provide your phone number so we can contact you:</p>
-          <div class="law-chat-phone-form">
-            <div class="law-chat-phone-input-container">
-              <div class="law-chat-phone-prefix">(</div>
-              <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
-              <div class="law-chat-phone-separator">)</div>
-              <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
-              <div class="law-chat-phone-separator">-</div>
-              <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
-              <button class="law-chat-phone-submit" disabled>Submit</button>
-            </div>
-            <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
-          </div>
-        `;
-        
-        // Add timestamp
-        const timeStamp = document.createElement('div');
-        timeStamp.className = 'law-chat-time';
-        timeStamp.textContent = formatTime();
-        
-        // Assemble the message
-        phoneMessage.appendChild(phoneContent);
-        phoneMessage.appendChild(timeStamp);
-        messagesContainer.appendChild(phoneMessage);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Add event listeners with the same phone input functionality
-        setTimeout(() => {
-          const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
-          const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
-          const lineInput = document.querySelector('.law-chat-phone-input.line');
-          const submitButton = document.querySelector('.law-chat-phone-submit');
-          
-          // Auto-focus the first input
-          areaCodeInput.focus();
-          
-          // Function to validate the phone number
-          const validatePhone = () => {
-            const areaCode = areaCodeInput.value;
-            const prefix = prefixInput.value;
-            const line = lineInput.value;
-            
-            // Enable/disable submit button based on form completeness
-            submitButton.disabled = !(
-              areaCode.length === 3 && 
-              prefix.length === 3 && 
-              line.length === 4 &&
-              /^[0-9]+$/.test(areaCode) &&
-              /^[0-9]+$/.test(prefix) &&
-              /^[0-9]+$/.test(line)
-            );
-          };
-          
-          // Add input listeners to each field
-          [areaCodeInput, prefixInput, lineInput].forEach(input => {
-            // Allow only numbers
-            input.addEventListener('input', (e) => {
-              e.target.value = e.target.value.replace(/[^0-9]/g, '');
-              validatePhone();
-              
-              // Auto-advance to next field if current is full
-              if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
-                if (e.target === areaCodeInput) prefixInput.focus();
-                if (e.target === prefixInput) lineInput.focus();
-              }
-            });
-            
-            // Handle backspace to go to previous field
-            input.addEventListener('keydown', (e) => {
-              if (e.key === 'Backspace' && e.target.value.length === 0) {
-                if (e.target === lineInput) prefixInput.focus();
-                if (e.target === prefixInput) areaCodeInput.focus();
-              }
-            });
-          });
-          
-          // Handle form submission
-          submitButton.addEventListener('click', () => {
-            const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
-            
-            // Send the phone number to the server
-            submitPhoneNumber(phoneNumber, true); // true indicates this is a referral
-            
-            // Add the phone number as a user message
-            addMessage(`My phone number is ${phoneNumber}`, true);
-            
-            // Update the chat stage
-            qualificationStage = 'qualified';
-            
-            // Show thank you message
-            addMessage("Thank you! We'll have an attorney contact you soon about a referral to a lawyer in your area. Is there anything else I can help with in the meantime?", false);
-          });
-        }, 100);
-      } else {
-        addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
-        // Set as qualified so they can continue chatting if they want
-        qualificationStage = 'qualified';
-      }
+function handleOptionSelection(value, text) {
+  // Create a more natural-sounding user message based on the selection
+  let naturalMessage = "";
+  
+  // Case type selection
+  if (qualificationStage === 'initial') {
+    switch(value) {
+      case 'personal-injury':
+        naturalMessage = "I need help with a Personal Injury case.";
+        break;
+      case 'criminal-defense':
+        naturalMessage = "I need help with a Criminal Defense case.";
+        break;
+      case 'divorce':
+        naturalMessage = "I need help with a Divorce case.";
+        break;
+      default:
+        naturalMessage = `I need help with a ${text} case.`;
+    }
+  } 
+  // Location selection
+  else if (qualificationStage === 'caseType') {
+    switch(value) {
+      case 'kansas':
+        naturalMessage = "My case is in Kansas.";
+        break;
+      case 'missouri':
+        naturalMessage = "My case is in Missouri.";
+        break;
+      case 'other':
+        naturalMessage = "My case is in another state.";
+        break;
+      default:
+        naturalMessage = `My case is in ${text}.`;
     }
   }
+  // Referral options
+  else if (qualificationStage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
+    if (value === 'yes-referral') {
+      naturalMessage = "Yes, I'd like to get a referral to an attorney in my area.";
+    } else {
+      naturalMessage = "No thanks, I don't need a referral at this time.";
+    }
+  }
+  // If no special case matches, use a fallback (but this shouldn't happen with the current flow)
+  else {
+    naturalMessage = text;
+  }
+  
+  // Add the natural-sounding message as a user message
+  addMessage(naturalMessage, true);
+  
+  // The rest of the function remains the same
+  // Handle the qualification flow
+  if (qualificationStage === 'initial') {
+    userCaseType = value;
+    qualificationStage = 'caseType';
+    
+    // Ask for location with buttons
+    const isKanasOrMissouri = [
+      { value: 'kansas', text: 'Kansas' },
+      { value: 'missouri', text: 'Missouri' },
+      { value: 'other', text: 'Other State' }
+    ];
+    addMessage("Thank you. Is your case in Kansas or Missouri?", false, isKanasOrMissouri);
+    
+  } else if (qualificationStage === 'caseType') {
+    userLocation = value;
+    qualificationStage = 'location';
+    
+    if (value === 'kansas' || value === 'missouri') {
+      // Qualified - proceed with phone collection
+      qualificationStage = 'phone-collection';
+      
+      // Create a phone number collection message
+      const phoneMessage = document.createElement('div');
+      phoneMessage.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create phone collection form
+      const phoneContent = document.createElement('div');
+      phoneContent.className = 'law-chat-bubble-content';
+      phoneContent.innerHTML = `
+        <p>Great! I'd be happy to discuss your ${userCaseType} case in ${text}.</p>
+        <p>To connect you with the right attorney, could you provide your phone number?</p>
+        <div class="law-chat-phone-form">
+          <div class="law-chat-phone-input-container">
+            <div class="law-chat-phone-prefix">(</div>
+            <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
+            <div class="law-chat-phone-separator">)</div>
+            <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
+            <div class="law-chat-phone-separator">-</div>
+            <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
+            <button class="law-chat-phone-submit" disabled>Submit</button>
+          </div>
+          <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
+        </div>
+      `;
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = formatTime();
+      
+      // Assemble the message
+      phoneMessage.appendChild(phoneContent);
+      phoneMessage.appendChild(timeStamp);
+      messagesContainer.appendChild(phoneMessage);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Add event listeners for the phone input fields
+      setTimeout(() => {
+        const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
+        const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
+        const lineInput = document.querySelector('.law-chat-phone-input.line');
+        const submitButton = document.querySelector('.law-chat-phone-submit');
+        
+        // Auto-focus the first input
+        areaCodeInput.focus();
+        
+        // Function to validate the phone number
+        const validatePhone = () => {
+          const areaCode = areaCodeInput.value;
+          const prefix = prefixInput.value;
+          const line = lineInput.value;
+          
+          // Enable/disable submit button based on form completeness
+          submitButton.disabled = !(
+            areaCode.length === 3 && 
+            prefix.length === 3 && 
+            line.length === 4 &&
+            /^[0-9]+$/.test(areaCode) &&
+            /^[0-9]+$/.test(prefix) &&
+            /^[0-9]+$/.test(line)
+          );
+        };
+        
+        // Add input listeners to each field
+        [areaCodeInput, prefixInput, lineInput].forEach(input => {
+          // Allow only numbers
+          input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            validatePhone();
+            
+            // Auto-advance to next field if current is full
+            if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
+              if (e.target === areaCodeInput) prefixInput.focus();
+              if (e.target === prefixInput) lineInput.focus();
+            }
+          });
+          
+          // Handle backspace to go to previous field
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && e.target.value.length === 0) {
+              if (e.target === lineInput) prefixInput.focus();
+              if (e.target === prefixInput) areaCodeInput.focus();
+            }
+          });
+        });
+        
+        // Handle form submission
+        submitButton.addEventListener('click', () => {
+          const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
+          
+          // Send the phone number to the server
+          submitPhoneNumber(phoneNumber);
+          
+          // Add the phone number as a user message
+          addMessage(`My phone number is ${phoneNumber}`, true);
+          
+          // Update the chat stage
+          qualificationStage = 'qualified';
+          
+          // Show thank you message
+          addMessage("Thank you for for that. Could you tell me a little bit about your case?", false);
+        });
+      }, 100);
+    } else {
+      // Not qualified - provide alternate contact
+      addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
+        { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
+        { value: 'no-thanks', text: 'No, thank you' }
+      ]);
+    }
+  } else if (qualificationStage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
+    if (value === 'yes-referral') {
+      // Ask for phone number for referral
+      qualificationStage = 'phone-collection';
+      
+      // Create a phone number collection message for referral
+      const phoneMessage = document.createElement('div');
+      phoneMessage.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create phone collection form
+      const phoneContent = document.createElement('div');
+      phoneContent.className = 'law-chat-bubble-content';
+      phoneContent.innerHTML = `
+        <p>We'd be happy to refer you to an attorney in your area.</p>
+        <p>Please provide your phone number so we can contact you:</p>
+        <div class="law-chat-phone-form">
+          <div class="law-chat-phone-input-container">
+            <div class="law-chat-phone-prefix">(</div>
+            <input type="tel" class="law-chat-phone-input area-code" maxlength="3" placeholder="000">
+            <div class="law-chat-phone-separator">)</div>
+            <input type="tel" class="law-chat-phone-input prefix" maxlength="3" placeholder="000">
+            <div class="law-chat-phone-separator">-</div>
+            <input type="tel" class="law-chat-phone-input line" maxlength="4" placeholder="0000">
+            <button class="law-chat-phone-submit" disabled>Submit</button>
+          </div>
+          <div class="law-chat-phone-privacy">Your information is secure and will not be shared with third parties.</div>
+        </div>
+      `;
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = formatTime();
+      
+      // Assemble the message
+      phoneMessage.appendChild(phoneContent);
+      phoneMessage.appendChild(timeStamp);
+      messagesContainer.appendChild(phoneMessage);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Add event listeners with the same phone input functionality
+      setTimeout(() => {
+        const areaCodeInput = document.querySelector('.law-chat-phone-input.area-code');
+        const prefixInput = document.querySelector('.law-chat-phone-input.prefix');
+        const lineInput = document.querySelector('.law-chat-phone-input.line');
+        const submitButton = document.querySelector('.law-chat-phone-submit');
+        
+        // Auto-focus the first input
+        areaCodeInput.focus();
+        
+        // Function to validate the phone number
+        const validatePhone = () => {
+          const areaCode = areaCodeInput.value;
+          const prefix = prefixInput.value;
+          const line = lineInput.value;
+          
+          // Enable/disable submit button based on form completeness
+          submitButton.disabled = !(
+            areaCode.length === 3 && 
+            prefix.length === 3 && 
+            line.length === 4 &&
+            /^[0-9]+$/.test(areaCode) &&
+            /^[0-9]+$/.test(prefix) &&
+            /^[0-9]+$/.test(line)
+          );
+        };
+        
+        // Add input listeners to each field
+        [areaCodeInput, prefixInput, lineInput].forEach(input => {
+          // Allow only numbers
+          input.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            validatePhone();
+            
+            // Auto-advance to next field if current is full
+            if (e.target.value.length === parseInt(e.target.getAttribute('maxlength'))) {
+              if (e.target === areaCodeInput) prefixInput.focus();
+              if (e.target === prefixInput) lineInput.focus();
+            }
+          });
+          
+          // Handle backspace to go to previous field
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && e.target.value.length === 0) {
+              if (e.target === lineInput) prefixInput.focus();
+              if (e.target === prefixInput) areaCodeInput.focus();
+            }
+          });
+        });
+        
+        // Handle form submission
+        submitButton.addEventListener('click', () => {
+          const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
+          
+          // Send the phone number to the server
+          submitPhoneNumber(phoneNumber, true); // true indicates this is a referral
+          
+          // Add the phone number as a user message
+          addMessage(`My phone number is ${phoneNumber}`, true);
+          
+          // Update the chat stage
+          qualificationStage = 'qualified';
+          
+          // Show thank you message
+          addMessage("Thank you! We'll have an attorney contact you soon about a referral to a lawyer in your area. Is there anything else I can help with in the meantime?", false);
+        });
+      }, 100);
+    } else {
+      addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
+      // Set as qualified so they can continue chatting if they want
+      qualificationStage = 'qualified';
+    }
+  }
+}
   
   function showTypingIndicator() {
     typingIndicator.style.display = 'flex';
@@ -1215,61 +1284,40 @@ function addMessage(content, isUser, options = null) {
 
   // variable to track API latency
   let apiLatency = 0;
+
+// Track whether we've sent the static transition message
+let transitionMessageSent = false;
+
+// Static transition message text
+const transitionMessage = "Thanks for sharing details about your case. Above are some resources we've written that might be helpful. It's always best to talk with one of our attorneys who can give advice tailored to your specific situation. We'd be happy to give you a call to discuss this further. In the meantime, feel free to ask me any questions, and I'll answer them!";
+
+let recommendationsShown = false;
   
-  async function sendMessageToOpenAI(message) {
+// Update the sendMessageToOpenAI function to use the new addOnlyRecommendations function
+async function sendMessageToOpenAI(message) {
   showTypingIndicator();
   
   // Record start time to measure API latency
   const startTime = Date.now();
   
+  // Check if this is the first substantive message about the case
+  // and we haven't sent the transition message yet
+  const isFirstCaseDetail = !transitionMessageSent && 
+                           qualificationStage === 'qualified' &&
+                           message.length > 5 &&
+                           !message.toLowerCase().includes("hello") &&
+                           !message.toLowerCase().includes("hi") &&
+                           !message.toLowerCase().includes("hey");
+  
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a helpful, friendly assistant for a law firm in Overland Park, Kansas. 
-            Your primary job is to provide information about ${userCaseType} cases, the law firm's services, and 
-            general guidance. Remember that you cannot provide specific legal advice. Always encourage potential 
-            clients to schedule a free consultation for specific case evaluations. The firm specializes in car accidents, 
-            truck accidents, slip and fall injuries, workplace injuries, medical malpractice, and wrongful death claims 
-            in the area of personal injury, as well as criminal defense and divorce/family law. 
-            They work on a contingency fee basis for personal injury cases - no fee unless they win the case. Free consultations are available 
-            by calling (913) 451-9500. The client has indicated they have a ${userCaseType} case in ${userLocation}.`
-          },
-          ...chatHistory
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      })
-    });
-    
-    // Calculate API latency
-    apiLatency = Date.now() - startTime;
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-    
-    // Check if recommendations are needed before adding the AI response
-    let recommendations = [];
-    if (qualificationStage === 'qualified') {
-      // Only query for recommendations after user is qualified and for certain topics
-      const shouldRecommendContent = userCaseType && 
-        (message.length > 10) && // Only for substantive messages
-        !message.toLowerCase().includes("hello") && // Skip greetings
-        !message.toLowerCase().includes("thank"); // Skip thank you messages
-
-      if (shouldRecommendContent) {
+    // If this is the first substantive case detail, we'll handle it differently
+    if (isFirstCaseDetail) {
+      // Calculate API latency for consistency
+      apiLatency = Date.now() - startTime;
+      
+      // Check if recommendations are needed
+      let recommendations = [];
+      if (qualificationStage === 'qualified') {
         try {
           // Context-aware search query that includes user's case type
           const searchQuery = `${userCaseType} ${message}`; 
@@ -1279,20 +1327,134 @@ function addMessage(content, isUser, options = null) {
           recommendations = [];
         }
       }
-    }
-    
-    // Make sure typing indicator is hidden
-    hideTypingIndicator();
-    
-    // Create a complete response that includes both AI response and recommendations
-    if (recommendations && recommendations.length > 0) {
-      // Add the message with recommendations
-      addMessageWithRecommendations(aiResponse, recommendations);
+      
+      // Hide typing indicator
+      hideTypingIndicator();
+      
+      // 1. Add recommendations if available using the new function
+      if (recommendations && recommendations.length > 0) {
+        addOnlyRecommendations(recommendations);
+        recommendationsShown = true; // Mark that we've shown recommendations
+      }
+      
+      // 2. Add the static transition message after a short delay
+      setTimeout(() => {
+        addMessage(transitionMessage, false);
+        
+        // Mark that we've sent the transition message
+        transitionMessageSent = true;
+        
+        // Make sure the static message is also added to chat history
+        chatHistory.push({
+          role: "assistant",
+          content: transitionMessage
+        });
+        
+      }, 1500);
+      
+      return; // Exit function after sending transition message
     } else {
-      // Just add the AI response without recommendations
-      addMessage(aiResponse, false);
+      // This is a regular follow-up message, process normally
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: `You are LegalAssist, an expert legal advisor for Roth Davies Law Firm in Overland Park, Kansas. Maintain a conversational, empathetic tone while being concise and focused.
+
+EXPERTISE AREAS:
+- ${userCaseType} cases in ${userLocation}
+- Personal Injury (contingency-based)
+- Criminal Defense
+- Family Law/Divorce
+
+RESPONSE GUIDELINES:
+- Keep responses under 60 words, using conversational language
+- Directly address what the client actually said
+- Show understanding of their specific situation
+- Demonstrate legal expertise without jargon
+- Vary your closing statements naturally
+- Only include the consultation number (913-451-9500) after developing a few additional messages of conversation, and only when relevant. Don't mention it in every response, and once you've mentioned it, don't repeat it.
+- Use contractions and natural speech patterns
+- Don't say a terminating statement like "If you have any questions or need more information, feel free to ask!" unless the other user has clearly terminated the conversation.
+- End with a question or prompt to keep the conversation going when appropriate
+
+APPROACH FOR DIFFICULT QUESTIONS:
+- Acknowledge emotional aspects first
+- Provide a brief, knowledgeable perspective on their situation
+- Suggest next steps in a way that shows your expertise
+- Never use generic disclaimers like "I can't advise on that"
+- Subtly redirect dangerous or extreme hypotheticals
+
+KEY QUALITY SIGNALS:
+- Sound like a knowledgeable legal professional chatting informally
+- Respond uniquely to each inquiry without template language
+- Show genuine understanding of legal implications
+- Convey expertise without lengthy explanations`
+            },
+            ...chatHistory
+          ],
+          temperature: 0.7,
+          max_tokens: 500
+        })
+      });
+      
+      // Calculate API latency
+      apiLatency = Date.now() - startTime;
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+      
+      // IMPORTANT: Only check for recommendations if we haven't shown them yet
+      let recommendations = [];
+      if (qualificationStage === 'qualified' && !recommendationsShown) {
+        // Only query for recommendations for substantial follow-up messages
+        const shouldRecommendContent = userCaseType && 
+          (message.length > 10) && // Only for substantive messages
+          !message.toLowerCase().includes("hello") && // Skip greetings
+          !message.toLowerCase().includes("thank"); // Skip thank you messages
+
+        if (shouldRecommendContent) {
+          try {
+            // Context-aware search query that includes user's case type
+            const searchQuery = `${userCaseType} ${message}`; 
+            recommendations = await queryPineconeForRelevantContent(searchQuery);
+            
+            if (recommendations && recommendations.length > 0) {
+              recommendationsShown = true; // Mark that we've shown recommendations
+            }
+          } catch (error) {
+            console.error("Error fetching recommendations:", error);
+            recommendations = [];
+          }
+        }
+      } else {
+        // We've already shown recommendations, so don't show them again
+        recommendations = [];
+      }
+      
+      // Make sure typing indicator is hidden
+      hideTypingIndicator();
+      
+      // Create a complete response that includes both AI response and recommendations
+      if (recommendations && recommendations.length > 0) {
+        // Add the message with recommendations
+        addMessageWithRecommendations(aiResponse, recommendations);
+      } else {
+        // Just add the AI response without recommendations
+        addMessage(aiResponse, false);
+      }
     }
-    
   } catch (error) {
     console.error("Error calling OpenAI API:", error);
     apiLatency = Date.now() - startTime; // Still record latency even for errors
@@ -1302,6 +1464,9 @@ function addMessage(content, isUser, options = null) {
 }
 
 // Update the addMessageWithRecommendations function to hide the typing indicator
+// Update the addMessageWithRecommendations function to show only titles
+// Update the addMessageWithRecommendations function with better formatting
+// Update addMessageWithRecommendations to handle empty content
 function addMessageWithRecommendations(content, recommendations) {
   // Hide typing indicator first
   hideTypingIndicator();
@@ -1310,43 +1475,58 @@ function addMessageWithRecommendations(content, recommendations) {
   const messageElement = document.createElement('div');
   messageElement.className = 'law-chat-message law-chat-message-bot';
   
-  // Create the message content
-  const messageContent = document.createElement('div');
-  messageContent.className = 'law-chat-bubble-content';
-  messageContent.innerHTML = content;
-  
   // Create the recommendations container
   const recommendationsDiv = document.createElement('div');
   recommendationsDiv.className = 'law-chat-recommendations';
   
   // Add heading
   const heading = document.createElement('h4');
-  heading.textContent = 'You might find these resources helpful:';
+  heading.textContent = 'Resources our attorneys have written for your case:';
   recommendationsDiv.appendChild(heading);
   
-  // Add each recommendation
+  // Create an unordered list for recommendations
+  const linkList = document.createElement('ul');
+  linkList.className = 'law-chat-recommendation-list';
+  
+  // Add each recommendation as a list item with a link
   recommendations.forEach(rec => {
-    const item = document.createElement('div');
-    item.className = 'law-chat-recommendation-item';
+    // Extract main title without suffix (everything before the first | character)
+    let cleanTitle = rec.title || 'Resource';
+    if (cleanTitle.includes('|')) {
+      cleanTitle = cleanTitle.split('|')[0].trim();
+    }
     
-    const title = document.createElement('a');
-    title.className = 'law-chat-recommendation-title';
-    title.href = rec.url || '#';
-    title.textContent = rec.title || 'Resource';
-    title.target = '_blank';
+    // Create list item
+    const listItem = document.createElement('li');
     
-    const snippet = document.createElement('p');
-    snippet.className = 'law-chat-recommendation-snippet';
-    snippet.textContent = rec.snippet || 'Related information about your case.';
+    // Create link
+    const link = document.createElement('a');
+    link.className = 'law-chat-recommendation-link';
+    link.href = rec.url || '#';
+    link.textContent = cleanTitle;
+    link.target = '_blank';
     
-    item.appendChild(title);
-    item.appendChild(snippet);
-    recommendationsDiv.appendChild(item);
+    // Add link to list item
+    listItem.appendChild(link);
+    
+    // Add list item to list
+    linkList.appendChild(listItem);
   });
   
-  // Add the recommendations before the message content
+  // Add the list to recommendations div
+  recommendationsDiv.appendChild(linkList);
+  
+  // Add the recommendations to the message element
   messageElement.appendChild(recommendationsDiv);
-  messageElement.appendChild(messageContent);
+  
+  // Only add content if it's not empty
+  if (content && content.trim() !== "") {
+    // Create the message content
+    const messageContent = document.createElement('div');
+    messageContent.className = 'law-chat-bubble-content';
+    messageContent.innerHTML = content;
+    messageElement.appendChild(messageContent);
+  }
   
   // Add timestamp
   const timeStamp = document.createElement('div');
@@ -1358,12 +1538,121 @@ function addMessageWithRecommendations(content, recommendations) {
   messagesContainer.appendChild(messageElement);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
   
-  // Update chat history
-  chatHistory.push({
-    role: "assistant",
-    content: content
+  // Update chat history if content is not empty
+  if (content && content.trim() !== "") {
+    chatHistory.push({
+      role: "assistant",
+      content: content
+    });
+  }
+}
+
+
+// Add a new function to show only recommendations without content
+function addOnlyRecommendations(recommendations) {
+  // Hide typing indicator first
+  hideTypingIndicator();
+  
+  // Create the message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create the recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+  
+  // Add heading
+  const heading = document.createElement('h4');
+  heading.textContent = 'You might find these resources helpful:';
+  recommendationsDiv.appendChild(heading);
+  
+  // Create an unordered list for recommendations
+  const linkList = document.createElement('ul');
+  linkList.className = 'law-chat-recommendation-list';
+  
+  // Add each recommendation as a list item with a link
+  recommendations.forEach(rec => {
+    // Extract main title without suffix (everything before the first | character)
+    let cleanTitle = rec.title || 'Resource';
+    if (cleanTitle.includes('|')) {
+      cleanTitle = cleanTitle.split('|')[0].trim();
+    }
+    
+    // Create list item
+    const listItem = document.createElement('li');
+    
+    // Create link
+    const link = document.createElement('a');
+    link.className = 'law-chat-recommendation-link';
+    link.href = rec.url || '#';
+    link.textContent = cleanTitle;
+    link.target = '_blank';
+    
+    // Add link to list item
+    listItem.appendChild(link);
+    
+    // Add list item to list
+    linkList.appendChild(listItem);
+  });
+  
+  // Add the list to recommendations div
+  recommendationsDiv.appendChild(linkList);
+  
+  // Add the recommendations to the message element
+  messageElement.appendChild(recommendationsDiv);
+  
+  // Add timestamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = formatTime();
+  messageElement.appendChild(timeStamp);
+  
+  // Append the message to the chat
+  messagesContainer.appendChild(messageElement);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  
+  // No need to update chat history for recommendations-only message
+}
+
+
+// Function to add the initial message after video completes
+function addInitialMessageAfterVideo(videoElement) {
+  // Listen for the 'ended' event on the video
+  videoElement.addEventListener('ended', () => {
+    // Initial greeting and first qualification question
+    // First show typing indicator
+    showTypingIndicator();
+    
+    // Add a slight delay before showing the message (simulating typing)
+    setTimeout(() => {
+      hideTypingIndicator();
+      addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
+        { value: 'personal-injury', text: 'Personal Injury' },
+        { value: 'criminal-defense', text: 'Criminal Defense' },
+        { value: 'divorce', text: 'Divorce' }
+      ]);
+    }, getRandomDelay(1500, 2500));
+  });
+  
+  // Also handle the case where video might fail to load or play
+  videoElement.addEventListener('error', () => {
+    // If video fails, still show the initial message
+    setTimeout(() => {
+      showTypingIndicator();
+      
+      setTimeout(() => {
+        hideTypingIndicator();
+        addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
+          { value: 'personal-injury', text: 'Personal Injury' },
+          { value: 'criminal-defense', text: 'Criminal Defense' },
+          { value: 'divorce', text: 'Divorce' }
+        ]);
+      }, getRandomDelay(1500, 2500));
+    }, 1000);
   });
 }
+
+
 // Fix 2: Fix the submitPhoneNumber function to enable the send button after phone submission
 function submitPhoneNumber(phoneNumber, isReferral = false) {
     console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
@@ -1899,18 +2188,68 @@ async function triggerRecommendations(message) {
       messagesContainer.appendChild(videoMessage);
       videoAdded = true;
       
-      // Wait a bit longer for video to start playing before showing first message
-      setTimeout(() => {
-        // Initial greeting and first qualification question
-        addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
-          { value: 'personal-injury', text: 'Personal Injury' },
-          { value: 'criminal-defense', text: 'Criminal Defense' },
-          { value: 'divorce', text: 'Divorce' }
-        ]);
-      }, getRandomDelay(1000, 1500)); // Longer initial delay for first message
+      // The initial message will now be triggered by the video's 'ended' event
+      // No need for setTimeout here anymore
     }
   }
 });
+// Add detailed CSS styling for the new recommendation format
+const newCssRules = `
+  /* Recommendations container */
+  .law-chat-recommendations {
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    background-color: #f0f7ff;
+    border-radius: 8px;
+    border-left: 3px solid #1a365d;
+    font-size: 14px;
+  }
+  
+  /* Heading */
+  .law-chat-recommendations h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #1a365d;
+    font-weight: 600;
+  }
+  
+  /* List styling */
+  .law-chat-recommendation-list {
+    margin: 0;
+    padding-left: 18px;
+    list-style-type: disc;
+  }
+  
+  /* List items */
+  .law-chat-recommendation-list li {
+    margin-bottom: 6px;
+  }
+  
+  /* Link styling */
+  .law-chat-recommendation-link {
+    color: #1a365d;
+    text-decoration: none;
+    border-bottom: 1px dotted #1a365d;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  
+  .law-chat-recommendation-link:hover {
+    color: #0d2b4e;
+    border-bottom: 1px solid #0d2b4e;
+  }
+  
+  /* Make sure the content after recommendations has proper spacing */
+  .law-chat-recommendations + .law-chat-bubble-content {
+    margin-top: 10px;
+  }
+`;
+
+// Add these style rules to the document
+const styleElement = document.createElement('style');
+styleElement.textContent = newCssRules;
+document.head.appendChild(styleElement);
   
   closeButton.addEventListener('click', () => {
     chatWindow.style.display = 'none';
