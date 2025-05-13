@@ -158,27 +158,56 @@
     },
     
     cacheElements() {
-      // Save references to frequently accessed elements for better performance
-      const selectors = Config.cssSelector;
-      this.elements = {
-        container: document.querySelector(selectors.container),
-        messages: document.querySelector(selectors.messages),
-        input: document.querySelector(selectors.input),
-        send: document.querySelector(selectors.send),
-        bubble: document.querySelector(selectors.bubble),
-        window: document.querySelector(selectors.window),
-        close: document.querySelector(selectors.close),
-        typing: document.querySelector(selectors.typing),
-        notification: document.querySelector(selectors.notification)
-      };
-      
-      // Auto-resize textarea as user types
-      this.elements.input.addEventListener('input', () => {
-        this.elements.input.style.height = 'auto';
-        const newHeight = Math.min(120, Math.max(24, this.elements.input.scrollHeight));
-        this.elements.input.style.height = `${newHeight}px`;
-      });
-    },
+  // Save references to frequently accessed elements for better performance
+  const selectors = Config.cssSelector;
+  this.elements = {
+    container: document.querySelector(selectors.container),
+    messages: document.querySelector(selectors.messages),
+    input: document.querySelector(selectors.input),
+    send: document.querySelector(selectors.send),
+    bubble: document.querySelector(selectors.bubble),
+    window: document.querySelector(selectors.window),
+    close: document.querySelector(selectors.close),
+    typing: document.querySelector(selectors.typing),
+    notification: document.querySelector(selectors.notification)
+  };
+  
+  // Improved auto-resize textarea functionality
+  this.elements.input.addEventListener('input', () => {
+    // Store the current scroll height
+    const previousScrollHeight = this.elements.input.scrollHeight;
+    
+    // Reset height to auto so we can accurately determine needed height
+    this.elements.input.style.height = 'auto';
+    
+    // Calculate the number of characters per line (approximation)
+    const inputWidth = this.elements.input.clientWidth;
+    const avgCharWidth = 8; // Average character width in pixels (approximate)
+    const charsPerLine = Math.floor(inputWidth / avgCharWidth) * 0.95; // 95% of total width
+    
+    // Only expand if text would wrap to next line
+    const text = this.elements.input.value;
+    const needsExpansion = text.length > charsPerLine || text.includes('\n');
+    
+    // Calculate the appropriate height
+    let newHeight;
+    if (needsExpansion) {
+      // Set height based on scrollHeight but with limits
+      newHeight = Math.min(120, Math.max(24, this.elements.input.scrollHeight));
+    } else {
+      // Keep single line height
+      newHeight = 24;
+    }
+    
+    // Apply the new height
+    this.elements.input.style.height = `${newHeight}px`;
+    
+    // If height increased, scroll to bottom of messages
+    if (newHeight > previousScrollHeight) {
+      this.scrollToBottom();
+    }
+  });
+},
     
     setupEventListeners() {
       // Chat toggle event listeners
@@ -448,6 +477,77 @@
           background: #c5cfd9;
           border-radius: 3px;
         }
+
+        /* Name Input Form - Updated Styling */
+        .law-chat-name-form {
+          margin-top: 12px;
+          width: 100%;
+        }
+
+        .law-chat-name-input-container {
+          display: flex;
+          align-items: center;
+          background-color: #f7f9fc;
+          border-radius: 12px;
+          padding: 8px 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          margin-bottom: 8px;
+          box-sizing: border-box; /* Ensure padding is included in width */
+          max-width: 100%; /* Ensure container doesn't exceed its parent */
+          flex-wrap: nowrap; /* Prevent wrapping */
+        }
+
+        .law-chat-name-input {
+          flex: 1;
+          min-width: 0; /* Allow input to shrink below default min-width */
+          border: none;
+          background: transparent;
+          font-size: 16px;
+          padding: 8px;
+          margin-right: 10px; /* Add space between input and button */
+          outline: none;
+          color: #1a365d;
+          box-sizing: border-box; /* Ensure padding is included */
+          overflow: hidden; /* Prevent overflow */
+          text-overflow: ellipsis; /* Add ellipsis for text overflow */
+        }
+
+        .law-chat-name-input:focus {
+          background-color: rgba(26, 54, 93, 0.05);
+          border-radius: 4px;
+        }
+
+        .law-chat-name-submit {
+          background-color: #1a365d;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 6px 12px;
+          font-size: 14px; /* Slightly reduce font size */
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          flex-shrink: 0; /* Prevent button from shrinking */
+          align-self: center; /* Center vertically */
+          white-space: nowrap; /* Prevent text wrapping */
+          max-width: 80px; /* Limit button width */
+          overflow: hidden; /* Prevent overflow */
+          text-overflow: ellipsis; /* Add ellipsis for text overflow */
+        }
+
+        .law-chat-name-submit:hover:not(:disabled) {
+          background-color: #12293f;
+          transform: translateY(-1px);
+        }
+
+        .law-chat-name-submit:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .law-chat-name-submit:disabled {
+          background-color: #cbd5e0;
+          cursor: not-allowed;
+        }
         
         /* Video as part of a message */
         .law-chat-video {
@@ -504,29 +604,52 @@
           gap: 8px;
         }
         
+        /* Updated Option Styles */
         .law-chat-option {
           background-color: #f0f4f8;
           border: 1px solid #c5cfd9;
           border-radius: 20px;
           padding: 8px 16px;
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 500; /* Make all options same weight from the start */
           color: #1a365d;
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          box-sizing: border-box; /* Ensures padding is included in width calculations */
         }
-        
+
         .law-chat-option:hover {
           background-color: #e4ecf7;
           border-color: #1a365d;
           transform: translateY(-1px);
           box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        
+
         .law-chat-option:active {
           transform: translateY(0);
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .law-chat-option.selected {
+          background-color: #1a365d; /* Use background color change instead of bold */
+          color: white; /* White text for better contrast */
+          border-color: #1a365d;
+          /* Remove font-weight change to prevent size changes */
+          box-shadow: none;
+          /* No transform to prevent layout shifts */
+          transform: none;
+        }
+
+        .law-chat-option.completed {
+          background-color: #e2e8f0;
+          color: #4a5568;
+          border-color: #cbd5e0;
+          cursor: default;
+          pointer-events: none; /* Disable interactions */
+          box-shadow: none;
+          /* No transform to prevent layout shifts */
+          transform: none;
         }
         
         .law-chat-time {
@@ -673,6 +796,9 @@
           height: 24px; /* Exact height for a single line of text */
           max-height: 120px;
           line-height: 24px; /* Match height for single line text */
+          white-space: pre-wrap; /* Preserve whitespace but allow wrapping */
+          word-break: break-word; /* Break long words if needed */
+          box-sizing: content-box; /* Make sure padding doesn't affect height calculation */
         }
         
         .law-chat-input:focus {
@@ -1113,6 +1239,13 @@
           });
         }
       }, delay);
+
+        if (!isUser && !options) {
+      // Use a longer timeout to ensure all DOM updates and animations are complete
+      setTimeout(() => {
+        this.disableCompletedOptions();
+      }, 500);
+    }
     },
     
     // Add recommendations with content
@@ -1245,9 +1378,221 @@
       
       // No need to update chat history for recommendations-only
     },
+
+    // Add to Messages module
+    addDisclaimerMessage() {
+      const message = "Utilizing this chat service does not create an attorney-client relationship. Any information communicated in this chat is not legal advice. Some of the responses may utilize AI based on the content of our website. Do you agree?";
+      
+      Messages.addMessage(message, false, [
+        { value: 'agree', text: 'I Agree' },
+        { value: 'decline', text: 'I Do Not Agree' }
+      ]);
+    },
+
+    // Disable options and inputs for completed steps
+    // Revise this method in the Messages module
+    disableCompletedOptions() {
+      // Only disable options from previous conversation stages
+      const currentStage = ChatFlow.stage;
+      
+      // Case type options should be disabled if we're past that stage
+      if (currentStage !== 'initial') {
+        const caseTypeOptions = document.querySelectorAll('.law-chat-option[data-value="personal-injury"], .law-chat-option[data-value="criminal-defense"], .law-chat-option[data-value="divorce"]');
+        caseTypeOptions.forEach(option => {
+          if (option.dataset.selected === 'true') {
+            option.classList.add('selected');
+          } else {
+            option.classList.add('completed');
+          }
+          option.style.pointerEvents = 'none'; // Disable interactions
+        });
+      }
+      
+      // Location options should be disabled if we're past that stage
+      if (currentStage !== 'initial' && currentStage !== 'caseType') {
+        const locationOptions = document.querySelectorAll('.law-chat-option[data-value="kansas"], .law-chat-option[data-value="missouri"], .law-chat-option[data-value="other"]');
+        locationOptions.forEach(option => {
+          if (option.dataset.selected === 'true') {
+            option.classList.add('selected');
+          } else {
+            option.classList.add('completed');
+          }
+          option.style.pointerEvents = 'none'; // Disable interactions
+        });
+      }
+      
+      // Referral options should be disabled if we're past that stage
+      if (currentStage !== 'initial' && currentStage !== 'caseType' && currentStage !== 'location') {
+        const referralOptions = document.querySelectorAll('.law-chat-option[data-value="yes-referral"], .law-chat-option[data-value="no-thanks"]');
+        referralOptions.forEach(option => {
+          if (option.dataset.selected === 'true') {
+            option.classList.add('selected');
+          } else {
+            option.classList.add('completed');
+          }
+          option.style.pointerEvents = 'none'; // Disable interactions
+        });
+      }
+      
+      // Disclaimer options should be disabled if we're qualified
+      if (currentStage === 'qualified') {
+        const disclaimerOptions = document.querySelectorAll('.law-chat-option[data-value="agree"], .law-chat-option[data-value="decline"]');
+        disclaimerOptions.forEach(option => {
+          if (option.dataset.selected === 'true') {
+            option.classList.add('selected');
+          } else {
+            option.classList.add('completed');
+          }
+          option.style.pointerEvents = 'none'; // Disable interactions
+        });
+      }
+      
+      // Disable name inputs if we're past the name stage
+      if (currentStage !== 'name-collection' && ChatFlow.userName) {
+        const nameInputs = document.querySelectorAll('.law-chat-name-input');
+        const nameSubmits = document.querySelectorAll('.law-chat-name-submit');
+        
+        nameInputs.forEach(input => {
+          input.classList.add('completed');
+          input.disabled = true;
+        });
+        
+        nameSubmits.forEach(button => {
+          button.classList.add('completed');
+          button.disabled = true;
+        });
+      }
+      
+      // Disable phone inputs if we're past the phone stage
+      if (currentStage !== 'phone-collection' && 
+        (currentStage === 'disclaimer' || currentStage === 'qualified')) {
+        const phoneInputs = document.querySelectorAll('.law-chat-phone-input');
+        const phoneSubmits = document.querySelectorAll('.law-chat-phone-submit');
+        
+        phoneInputs.forEach(input => {
+          input.classList.add('completed');
+          input.disabled = true;
+        });
+        
+        phoneSubmits.forEach(button => {
+          button.classList.add('completed');
+          button.disabled = true;
+        });
+      }
+    },
+
+    createNameInputForm(isReferral = false) {
+      // Create the message
+      const nameMessage = document.createElement('div');
+      nameMessage.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create content
+      const nameContent = document.createElement('div');
+      nameContent.className = 'law-chat-bubble-content';
+      
+      // Different text based on if it's a referral
+      if (isReferral) {
+        nameContent.innerHTML = `
+          <p>We'd be happy to refer you to an attorney in your area.</p>
+          <p>First, could you please tell me your name?</p>
+        `;
+      } else {
+        nameContent.innerHTML = `
+          <p>Great! I'd be happy to discuss your ${ChatFlow.userCaseType} case in ${ChatFlow.getLocationDisplay()}.</p>
+          <p>First, could you please tell me your name?</p>
+        `;
+      }
+      
+      // Add name form
+      const nameForm = document.createElement('div');
+      nameForm.className = 'law-chat-name-form';
+      nameForm.innerHTML = `
+        <div class="law-chat-name-input-container">
+          <input type="text" class="law-chat-name-input" placeholder="Your name">
+          <button class="law-chat-name-submit" disabled>Submit</button>
+        </div>
+      `;
+      
+      nameContent.appendChild(nameForm);
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = UI.formatTime();
+      
+      // Assemble everything
+      nameMessage.appendChild(nameContent);
+      nameMessage.appendChild(timeStamp);
+      
+      DOM.elements.messages.appendChild(nameMessage);
+      DOM.scrollToBottom();
+      
+      // Add event listeners for the name input
+      setTimeout(() => {
+        // Get name input field and submit button
+        const nameInput = document.querySelector('.law-chat-name-input');
+        const submitButton = document.querySelector('.law-chat-name-submit');
+        
+        // Focus input
+        nameInput.focus();
+        
+        // Validate input function
+        const validateName = () => {
+          submitButton.disabled = nameInput.value.trim().length === 0;
+        };
+        
+        // Add input handler
+        nameInput.addEventListener('input', validateName);
+        
+        // Handle enter key press
+        nameInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !submitButton.disabled) {
+            submitButton.click();
+          }
+        });
+        
+        // Handle form submission
+        // Update the name input form submission handler
+      // Update in the createNameInputForm method
+      submitButton.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        
+        // Store name
+        ChatFlow.userName = name;
+        
+        // Disable the name input and button
+        nameInput.disabled = true;
+        nameInput.classList.add('completed');
+        submitButton.disabled = true;
+        submitButton.classList.add('completed');
+        
+        // Add as user message
+        this.addMessage(`My name is ${name}`, true);
+        
+        // Update flow state to phone collection
+        ChatFlow.stage = 'phone-collection';
+        
+        // Show typing indicator before showing phone form
+        UI.showTypingIndicator();
+        
+        // Use setTimeout to simulate typing delay
+        setTimeout(() => {
+          // Hide typing indicator
+          UI.hideTypingIndicator();
+          
+          // Show phone collection form
+          const isReferral = ChatFlow.userLocation === 'other';
+          this.createPhoneInputForm(isReferral);
+        }, UI.getRandomDelay()); // Use a random delay from the UI module for consistency
+      });
+      }, 100);
+    },
     
     // Creates phone input form
     createPhoneInputForm(isReferral = false) {
+      // Make sure typing indicator is hidden before creating the form
+      UI.hideTypingIndicator();
+
       // Create the message
       const phoneMessage = document.createElement('div');
       phoneMessage.className = 'law-chat-message law-chat-message-bot';
@@ -1351,8 +1696,19 @@
         });
         
         // Handle form submission
+        // Inside the createPhoneInputForm method, modify the submit button event listener:
+        // Update the phone form submission handler
+        // Update in the createPhoneInputForm method, in the submit button event listener
         submitButton.addEventListener('click', () => {
           const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
+          
+          // Disable all phone inputs and button
+          document.querySelectorAll('.law-chat-phone-input').forEach(input => {
+            input.disabled = true;
+            input.classList.add('completed');
+          });
+          submitButton.disabled = true;
+          submitButton.classList.add('completed');
           
           // Submit phone to server
           API.submitPhoneNumber(phoneNumber, isReferral);
@@ -1360,15 +1716,20 @@
           // Add as user message
           this.addMessage(`My phone number is ${phoneNumber}`, true);
           
-          // Update flow state
-          ChatFlow.stage = 'qualified';
+          // Update flow state to show disclaimer
+          ChatFlow.stage = 'disclaimer';
           
-          // Show thank you message
-          if (isReferral) {
-            this.addMessage("Thank you! We'll have an attorney contact you soon about a referral to a lawyer in your area. Is there anything else I can help with in the meantime?", false);
-          } else {
-            this.addMessage("Thank you for that. Could you tell me a little bit about your case?", false);
-          }
+          // Show typing indicator before showing disclaimer
+          UI.showTypingIndicator();
+          
+          // Use setTimeout to simulate typing delay
+          setTimeout(() => {
+            // Hide typing indicator
+            UI.hideTypingIndicator();
+            
+            // Show disclaimer message
+            this.addDisclaimerMessage();
+          }, UI.getRandomDelay()); // Use a random delay from the UI module
           
           // Ensure send button is enabled
           setTimeout(() => {
@@ -1384,7 +1745,25 @@
     stage: 'initial', // initial, caseType, location, phone-collection, qualified
     userCaseType: null,
     userLocation: null,
+    userName: null,
     history: [],
+
+    disablePreviousOptions(selectedOption) {
+      if (!selectedOption) return;
+      
+      // Mark the selected option
+      selectedOption.classList.add('selected');
+      
+      // Disable all other options in this group
+      const optionsGroup = selectedOption.closest('.law-chat-options');
+      if (optionsGroup) {
+        const siblingOptions = optionsGroup.querySelectorAll('.law-chat-option:not([data-selected="true"])');
+        siblingOptions.forEach(option => {
+          option.classList.add('completed');
+          option.style.pointerEvents = 'none'; // Disable interactions
+        });
+      }
+    },
     
     // Process user's direct text input
     handleUserMessage(message) {
@@ -1413,14 +1792,21 @@
     },
     
     // Process option button selection
+    // Modify the handleOptionSelection method
     handleOptionSelection(value, text) {
+      // Store the selected option without disabling anything yet
+      const selectedOption = event?.target || document.querySelector(`.law-chat-option[data-value="${value}"]`);
+      if (selectedOption) {
+        selectedOption.dataset.selected = 'true';
+      }
+      
       // Create natural-sounding response based on selection
       let naturalMessage = this.createNaturalResponse(value, text);
       
       // Add as user message
       Messages.addMessage(naturalMessage, true);
       
-      // Process based on current stage
+      // Process based on current stage (keep the existing logic)
       if (this.stage === 'initial') {
         this.userCaseType = value;
         this.stage = 'caseType';
@@ -1431,35 +1817,77 @@
           { value: 'missouri', text: 'Missouri' },
           { value: 'other', text: 'Other State' }
         ]);
+        
+        // Only now disable the previous options
+        setTimeout(() => {
+          this.disablePreviousOptions(selectedOption);
+        }, 100);
       } else if (this.stage === 'caseType') {
         this.userLocation = value;
         this.stage = 'location';
         
-        if (value === 'kansas' || value === 'missouri') {
-          // Qualified - proceed with phone collection
-          this.stage = 'phone-collection';
-          Messages.createPhoneInputForm(false);
+        if (value === 'kansas') {
+          // Kansas handles all case types
+          this.stage = 'name-collection';
+          Messages.createNameInputForm();
+        } else if (value === 'missouri' && this.userCaseType === 'personal-injury') {
+          // Missouri only handles personal injury cases
+          this.stage = 'name-collection';
+          Messages.createNameInputForm();
+        } else if (value === 'missouri' && 
+                  (this.userCaseType === 'criminal-defense' || this.userCaseType === 'divorce')) {
+          // Not qualified for Missouri criminal defense or divorce
+          Messages.addMessage(`I'm sorry, but our firm only handles ${this.getCaseTypeDisplay()} cases in Kansas, not Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in Missouri?`, false, [
+            { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
+            { value: 'no-thanks', text: 'No, thank you' }
+          ]);
         } else {
-          // Not qualified - provide referral option
+          // Not qualified - in a state other than KS or MO
           Messages.addMessage("I'm sorry, but our firm only handles cases in Kansas and Missouri. Would you like to speak with one of our attorneys anyway to see if we can refer you to someone in your area?", false, [
             { value: 'yes-referral', text: 'Yes, I\'d like a referral' },
             { value: 'no-thanks', text: 'No, thank you' }
           ]);
         }
+        
+        // Only now disable the previous options
+        setTimeout(() => {
+          this.disablePreviousOptions(selectedOption);
+        }, 100);
       } else if (this.stage === 'location' && (value === 'yes-referral' || value === 'no-thanks')) {
         if (value === 'yes-referral') {
-          // Ask for phone for referral
-          this.stage = 'phone-collection';
-          Messages.createPhoneInputForm(true);
+          // Ask for name first
+          this.stage = 'name-collection';
+          Messages.createNameInputForm(true);
         } else {
           Messages.addMessage("I understand. If you have any other questions or change your mind, please feel free to ask. Is there anything else I can help with?", false);
           // Set as qualified so they can chat if they want
           this.stage = 'qualified';
         }
+        
+        // Only now disable the previous options
+        setTimeout(() => {
+          this.disablePreviousOptions(selectedOption);
+        }, 100);
+      } else if (this.stage === 'disclaimer') {
+        if (value === 'agree') {
+          // User agreed to disclaimer, now they're qualified
+          this.stage = 'qualified';
+          Messages.addMessage("Thank you. Could you tell me a little bit about your case?", false);
+        } else {
+          // User did not agree
+          Messages.addMessage("I understand. Without your agreement, we cannot continue the consultation. If you change your mind or have other questions, please feel free to chat with us again.", false);
+          // Leave at disclaimer stage
+        }
+        
+        // Only now disable the previous options
+        setTimeout(() => {
+          this.disablePreviousOptions(selectedOption);
+        }, 100);
       }
     },
     
     // Create a natural-sounding message based on option selection
+    // Add this to the createNaturalResponse method in ChatFlow
     createNaturalResponse(value, text) {
       if (this.stage === 'initial') {
         return `I need help with a ${text} case.`;
@@ -1470,6 +1898,12 @@
           return "Yes, I'd like to get a referral to an attorney in my area.";
         } else {
           return "No thanks, I don't need a referral at this time.";
+        }
+      } else if (this.stage === 'disclaimer') {
+        if (value === 'agree') {
+          return "I agree to the terms.";
+        } else {
+          return "I do not agree.";
         }
       }
       
