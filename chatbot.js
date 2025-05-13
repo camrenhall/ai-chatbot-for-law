@@ -24,7 +24,7 @@
     accountSid: siteConfig.twilio?.accountSid || "",
     authToken: siteConfig.twilio?.authToken || "", 
     fromNumber: siteConfig.twilio?.fromNumber || "+19133956075",
-    toNumber: siteConfig.twilio?.toNumber || "+19136020456"
+    toNumber: siteConfig.twilio?.toNumber || "+19134753876"
     },
     videos: {
     default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
