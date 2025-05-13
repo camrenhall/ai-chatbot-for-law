@@ -675,36 +675,33 @@
   }
   
   // Video sources based on page path keywords
-  const videoMap = {
-    'default': 'welcome.mp4',
-    'personal-injury': 'personal-injury.mp4',
-    'criminal-defense': 'criminal-defense.mp4',
-    'divorce': 'family-law.mp4'
-  };
+// Update the video map with GitHub repository URLs
+const videoMap = {
+  'default': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/welcome.mp4',
+  'personal-injury': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/personal-injury.mp4',
+  'criminal-defense': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/criminal-defense.mp4',
+  'divorce': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/family-law.mp4'
+};
+
+// Modify the getVideoFilename function to return the full URL
+function getVideoFilename() {
+  const currentPath = window.location.pathname.toLowerCase();
+  let videoUrl = videoMap.default;
   
-  // Create the file input for fallback method
-  const videoFileInput = createFileInput();
-  
-  // Set video source based on current page
-  // Get video filename based on current page
-  function getVideoFilename() {
-    const currentPath = window.location.pathname.toLowerCase();
-    let videoFilename = videoMap.default;
-    
-    if (currentPath.includes('personal-injury')) {
-      videoFilename = videoMap['personal-injury'];
-    } else if (currentPath.includes('criminal') || currentPath.includes('defense')) {
-      videoFilename = videoMap['criminal-defense'];
-    } else if (currentPath.includes('divorce') || currentPath.includes('family')) {
-      videoFilename = videoMap['divorce'];
-    }
-    
-    return videoFilename;
+  if (currentPath.includes('personal-injury')) {
+    videoUrl = videoMap['personal-injury'];
+  } else if (currentPath.includes('criminal') || currentPath.includes('defense')) {
+    videoUrl = videoMap['criminal-defense'];
+  } else if (currentPath.includes('divorce') || currentPath.includes('family')) {
+    videoUrl = videoMap['divorce'];
   }
+  
+  return videoUrl;
+}
   
   // Set video source using direct URL method first, with fallback to file input if needed
   function createVideoMessage() {
-  const videoFilename = getVideoFilename();
+  const videoUrl = getVideoFilename();
   
   // Create the video message container
   const videoMessage = document.createElement('div');
@@ -722,33 +719,25 @@
   videoElement.muted = false; // Allow sound
   videoElement.playsInline = true; // For iOS
   
-  // First try with a relative path
-  const videoSrc = `videos/${videoFilename}`;
-  videoElement.src = videoSrc;
+  // Use the GitHub URL directly
+  videoElement.src = videoUrl;
   
   // Set up the event listener for video completion
   addInitialMessageAfterVideo(videoElement);
   
-  // Add error handling for video loading
+  // Modify error handling for video loading to use the GitHub CDN as a fallback
   videoElement.onerror = function() {
-    console.log("Error loading video with direct path, trying alternate methods...");
+    console.log("Error loading video from GitHub, trying alternate methods...");
     
-    // Try with a file URL as fallback (only works on some browsers)
-    if (window.location.protocol === 'file:') {
-      // For local file testing
-      const videoPath = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}`;
-      const fullPath = `${videoPath}/videos/${videoFilename}`;
-      console.log("Trying with file URL:", fullPath);
-      videoElement.src = fullPath;
-      
-      videoElement.onerror = function() {
-        // Last resort - show file input on error
-        handleVideoLoadError(messageContent, videoElement);
-      };
-    } else {
+    // Try a different GitHub path format as a fallback
+    const alternateGitHubUrl = videoUrl.replace('/raw/refs/heads/main/', '/main/');
+    console.log("Trying alternate GitHub URL:", alternateGitHubUrl);
+    videoElement.src = alternateGitHubUrl;
+    
+    videoElement.onerror = function() {
       // Last resort - show file input on error
       handleVideoLoadError(messageContent, videoElement);
-    }
+    };
   };
   
   // Assemble the message
@@ -789,58 +778,27 @@
     container.removeChild(videoElement);
   }
   
-  // Display a message and button to select video
+  // Display a message about the error
   const errorMessage = document.createElement('div');
   errorMessage.innerHTML = `
-    <p style="margin-bottom: 10px;">Unable to load the introduction video automatically.</p>
-    <button id="select-video-btn" style="padding: 8px 16px; background: #c41230; color: white; border: none; border-radius: 4px; cursor: pointer;">
-      Select Video Manually
-    </button>
+    <p style="margin-bottom: 10px;">Unable to load the introduction video. This could be due to network issues or because the video is unavailable.</p>
+    <p>Let's continue with your consultation.</p>
   `;
   container.appendChild(errorMessage);
   
-  // Add click event to the button
+  // Proceed with the initial message without requiring manual video selection
   setTimeout(() => {
-    document.getElementById('select-video-btn').addEventListener('click', function() {
-      videoFileInput.click();
-    });
+    showTypingIndicator();
     
-    // Handle file selection
-    videoFileInput.onchange = function() {
-      if (this.files && this.files[0]) {
-        const objectURL = URL.createObjectURL(this.files[0]);
-        
-        // Remove the error message
-        container.removeChild(errorMessage);
-        
-        // Reset the video element
-        videoElement.src = objectURL;
-        container.appendChild(videoElement);
-        
-        // Reattach the video ended event listener
-        addInitialMessageAfterVideo(videoElement);
-        
-        videoElement.load();
-        videoElement.play().catch(e => console.log("Autoplay prevented:", e));
-      }
-    };
-    
-    // If video selection fails, show the message after a timeout
     setTimeout(() => {
-      if (!videoElement.parentNode) {
-        showTypingIndicator();
-        
-        setTimeout(() => {
-          hideTypingIndicator();
-          addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
-            { value: 'personal-injury', text: 'Personal Injury' },
-            { value: 'criminal-defense', text: 'Criminal Defense' },
-            { value: 'divorce', text: 'Divorce' }
-          ]);
-        }, getRandomDelay(1500, 2500));
-      }
-    }, 10000); // Wait 10 seconds for user to select a video
-  }, 0);
+      hideTypingIndicator();
+      addMessage("Hi there! I'm the virtual assistant here at Roth Davies. What type of case do you need help with?", false, [
+        { value: 'personal-injury', text: 'Personal Injury' },
+        { value: 'criminal-defense', text: 'Criminal Defense' },
+        { value: 'divorce', text: 'Divorce' }
+      ]);
+    }, getRandomDelay(1500, 2500));
+  }, 2000);
 }
   
   // OpenAI API Key - This should be replaced with a secure backend in production
@@ -1563,7 +1521,7 @@ function addOnlyRecommendations(recommendations) {
   
   // Add heading
   const heading = document.createElement('h4');
-  heading.textContent = 'You might find these resources helpful:';
+  heading.textContent = 'Our attorneys wrote these resources for you:';
   recommendationsDiv.appendChild(heading);
   
   // Create an unordered list for recommendations
