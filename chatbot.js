@@ -906,7 +906,7 @@
       videoMessage.className = 'law-chat-message law-chat-message-bot';
       
       // Create message content container
-      const messageContent = document.createElement('div');
+      let messageContent = document.createElement('div');
       messageContent.className = 'law-chat-bubble-content';
       
       // Create video element
@@ -1161,7 +1161,7 @@
       
       // Add content if provided
       if (content && content.trim() !== "") {
-        const messageContent = document.createElement('div');
+        let messageContent = document.createElement('div');
         messageContent.className = 'law-chat-bubble-content';
         messageContent.innerHTML = content;
         messageElement.appendChild(messageContent);
