@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Law Firm Chatbot Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="background-color: #f5f6f7; margin: 0; padding: 0; font-family: Arial, sans-serif;">
+  <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+    <header style="background-color: #1a365d; color: white; padding: 20px; border-radius: 8px;">
+      <h1>Roth Davies Law Firm</h1>
+      <p>Experienced Attorneys Fighting For Your Rights</p>
+    </header>
+    
+    <div style="background-color: white; margin-top: 20px; padding: 30px; border-radius: 8px; min-height: 400px;">
+      <h2>Personal Injury Services</h2>
+      <p>This is a demo page to showcase the chatbot functionality. In a real implementation, this would be the law firm's actual website content.</p>
+      <p>Try clicking the chat bubble in the bottom right corner to test the chatbot!</p>
+    </div>
+  </div>
+
+  <!-- Custom Personal Injury Law Firm Chatbot -->
+  <script>
+    (function() {
+      // Configuration - easily change version or source
+      const config = {
+        scriptUrl: 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/chatbot.js',
+        // Optional: Pass website-specific configuration
+        siteConfig: {
+          firmName: 'Roth Davies Law Firm',
+          primaryColor: '#1a365d',
+          accentColor: '#0f4c81',
+          supportPhone: '913-451-9500',
+          // Optional: Override video URLs if needed
+          videos: {
+            default: 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/welcome.mp4'
+          },
+          // Optional: Integration keys - better to load these from server in production
+          // openai: { apiKey: "your-key-here" }
+        }
+      };
+      
+      // Create a global configuration object that the external script can access
+      window.LawChatbotConfig = config.siteConfig || {};
+      
+      // Create and append the script element
+      const script = document.createElement('script');
+      script.src = config.scriptUrl;
+      script.async = true;
+      script.defer = true;
+      
+      // Add error handling
+      script.onerror = function() {
+        console.error('Failed to load the chatbot script. Please check the URL or network connection.');
+      };
+      
+      // Append to document
+      document.body.appendChild(script);
+    })();
+  </script>
+</body>
+</html>'

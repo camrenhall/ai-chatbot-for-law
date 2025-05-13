@@ -1,25 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Law Firm Chatbot Demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="background-color: #f5f6f7; margin: 0; padding: 0; font-family: Arial, sans-serif;">
-  <div style="max-width: 1200px; margin: 0 auto; padding: 20px;">
-    <header style="background-color: #1a365d; color: white; padding: 20px; border-radius: 8px;">
-      <h1>Roth Davies Law Firm</h1>
-      <p>Experienced Attorneys Fighting For Your Rights</p>
-    </header>
-    
-    <div style="background-color: white; margin-top: 20px; padding: 30px; border-radius: 8px; min-height: 400px;">
-      <h2>Personal Injury Services</h2>
-      <p>This is a demo page to showcase the chatbot functionality. In a real implementation, this would be the law firm's actual website content.</p>
-      <p>Try clicking the chat bubble in the bottom right corner to test the chatbot!</p>
-    </div>
-  </div>
-
-  <!-- Custom Personal Injury Law Firm Chatbot -->
-<script>
 /**
  * Roth Davies Law Firm Chatbot
  * A modular, performance-optimized implementation
@@ -1977,6 +1955,3 @@ KEY QUALITY SIGNALS:
   DOM.initialize();
 
 })();
-</script>
-</body>
-</html>'
