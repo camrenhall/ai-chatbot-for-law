@@ -23,10 +23,10 @@
       toNumber: "+19136020456"
     },
     videos: {
-      default: 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/welcome.mp4',
-      'personal-injury': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/personal-injury.mp4',
-      'criminal-defense': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/criminal-defense.mp4',
-      'divorce': 'https://github.com/camrenhall/roth-davies-videos/raw/refs/heads/main/videos/family-law.mp4'
+      default: 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
+      'personal-injury': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/personal-injury.mp4',
+      'criminal-defense': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/criminal-defense.mp4',
+      'divorce': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/family-law.mp4'
     },
     timing: {
       minTypingDelay: 1500,
@@ -1037,7 +1037,7 @@
         const messageElement = document.createElement('div');
         messageElement.className = `law-chat-message ${messageClass}`;
         
-        const messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+        let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
         messageContent += `<div class="law-chat-time">${messageTime}</div>`;
         messageElement.innerHTML = messageContent;
         
