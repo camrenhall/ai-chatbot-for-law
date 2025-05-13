@@ -4,34 +4,38 @@
  */
 (function() {
   // Configuration module - centralized settings
+  
+  // Get site-specific config if provided
+  const siteConfig = window.LawChatbotConfig || {};
+
   const Config = {
-    // API keys - would be moved to server-side in production
+    // API keys - merged with defaults
     openai: {
-      apiKey: "",
-      model: "gpt-4o"
+    apiKey: siteConfig.openai?.apiKey || "",
+    model: siteConfig.openai?.model || "gpt-4o"
     },
     pinecone: {
-      apiKey: "",
-      index: "roth-davies-legal",
-      environment: "us-east-1-aws",
-      projectId: ""
+    apiKey: siteConfig.pinecone?.apiKey || "",
+    index: siteConfig.pinecone?.index || "roth-davies-legal",
+    environment: siteConfig.pinecone?.environment || "us-east-1-aws",
+    projectId: siteConfig.pinecone?.projectId || ""
     },
     twilio: {
-      accountSid: "",
-      authToken: "", // Would use proper auth in production
-      fromNumber: "+19133956075",
-      toNumber: "+19136020456"
+    accountSid: siteConfig.twilio?.accountSid || "",
+    authToken: siteConfig.twilio?.authToken || "", 
+    fromNumber: siteConfig.twilio?.fromNumber || "+19133956075",
+    toNumber: siteConfig.twilio?.toNumber || "+19136020456"
     },
     videos: {
-      default: 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
-      'personal-injury': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/personal-injury.mp4',
-      'criminal-defense': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/criminal-defense.mp4',
-      'divorce': 'https://camrenhall.github.io/ai-chatbot-for-law/videos/family-law.mp4'
+    default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
+    'personal-injury': siteConfig.videos?.['personal-injury'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/personal-injury.mp4',
+    'criminal-defense': siteConfig.videos?.['criminal-defense'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/criminal-defense.mp4',
+    'divorce': siteConfig.videos?.['divorce'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/family-law.mp4'
     },
     timing: {
-      minTypingDelay: 1500,
-      maxTypingDelay: 2500,
-      notificationDelay: 2000
+    minTypingDelay: siteConfig.timing?.minTypingDelay || 1500,
+    maxTypingDelay: siteConfig.timing?.maxTypingDelay || 2500,
+    notificationDelay: siteConfig.timing?.notificationDelay || 2000
     },
     cssSelector: {
       container: '.law-chat-widget',
