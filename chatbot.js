@@ -11,9 +11,9 @@
   const Config = {
     // API keys - merged with defaults
     docsbot: {
-      teamId: siteConfig.docsbot?.teamId || "plaz4hUowA4K2E2Pz5dc",
-      botId: siteConfig.docsbot?.botId || "5lhu0alGb4Ggy58RadtH",
-      apiKey: siteConfig.docsbot?.apiKey || "e5326dd3d34acebb28e95ec83ae742f17661fcf3935f43f1fe3e75ef5f63a884",
+      teamId: siteConfig.docsbot?.teamId || "",
+      botId: siteConfig.docsbot?.botId || "",
+      apiKey: siteConfig.docsbot?.apiKey || "",
       defaultLanguage: siteConfig.docsbot?.defaultLanguage || "en-US"
     },
     twilio: {
