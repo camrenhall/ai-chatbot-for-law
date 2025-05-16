@@ -10,15 +10,11 @@
 
   const Config = {
     // API keys - merged with defaults
-    openai: {
-    apiKey: siteConfig.openai?.apiKey || "",
-    model: siteConfig.openai?.model || "gpt-4o"
-    },
-    pinecone: {
-    apiKey: siteConfig.pinecone?.apiKey || "",
-    index: siteConfig.pinecone?.index || "roth-davies-legal",
-    environment: siteConfig.pinecone?.environment || "us-east-1-aws",
-    projectId: siteConfig.pinecone?.projectId || ""
+    docsbot: {
+      teamId: siteConfig.docsbot?.teamId || "plaz4hUowA4K2E2Pz5dc",
+      botId: siteConfig.docsbot?.botId || "5lhu0alGb4Ggy58RadtH",
+      apiKey: siteConfig.docsbot?.apiKey || "e5326dd3d34acebb28e95ec83ae742f17661fcf3935f43f1fe3e75ef5f63a884",
+      defaultLanguage: siteConfig.docsbot?.defaultLanguage || "en-US"
     },
     twilio: {
     accountSid: siteConfig.twilio?.accountSid || "",
@@ -295,6 +291,13 @@
           font-family: 'Arial', sans-serif;
           position: fixed;
           z-index: 9999;
+        }
+
+        /* Thinking message style */
+        .law-chat-thinking-message .law-chat-bubble-content {
+          background-color: #f0f4f8;
+          color: #4a5568;
+          font-style: italic;
         }
         
         /* Chat Bubble - Enhanced with glowing effect and text */
@@ -761,7 +764,7 @@
         .law-chat-phone-submit:active:not(:disabled) {
           transform: translateY(0);
         }
-        
+
         .law-chat-phone-submit:disabled {
           background-color: #cbd5e0;
           cursor: not-allowed;
@@ -1157,96 +1160,176 @@
   
   // Messages Module - handles message creation, display, and user interactions
   const Messages = {
-    // Add a message to the chat
-    addMessage(content, isUser, options = null) {
-      // For user messages, add immediately
-      if (isUser) {
-        const messageClass = 'law-chat-message-user';
-        const messageTime = UI.formatTime();
+      // Add this method to the Messages module to handle sources from DocsBots
+      addMessageWithSources(content, sources) {
+        UI.hideTypingIndicator();
         
+        // Create the message element
         const messageElement = document.createElement('div');
-        messageElement.className = `law-chat-message ${messageClass}`;
+        messageElement.className = 'law-chat-message law-chat-message-bot';
         
-        let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
-        messageContent += `<div class="law-chat-time">${messageTime}</div>`;
-        messageElement.innerHTML = messageContent;
+        // Add content
+        let messageContent = document.createElement('div');
+        messageContent.className = 'law-chat-bubble-content';
+        messageContent.innerHTML = content;
+        messageElement.appendChild(messageContent);
         
+        // Create sources container if we have sources
+        if (sources && sources.length > 0) {
+          const sourcesDiv = document.createElement('div');
+          sourcesDiv.className = 'law-chat-recommendations';
+          
+          // Add heading
+          const heading = document.createElement('h4');
+          heading.textContent = 'Sources:';
+          sourcesDiv.appendChild(heading);
+          
+          // Create list for sources
+          const sourceList = document.createElement('ul');
+          sourceList.className = 'law-chat-recommendation-list';
+          
+          // Add each source as a list item
+          sources.slice(0, 3).forEach(source => {
+            const listItem = document.createElement('li');
+            
+            if (source.url) {
+              const link = document.createElement('a');
+              link.className = 'law-chat-recommendation-link';
+              link.href = source.url;
+              link.textContent = source.title || 'Source';
+              link.target = '_blank';
+              listItem.appendChild(link);
+            } else {
+              listItem.textContent = source.title || 'Source';
+            }
+            
+            sourceList.appendChild(listItem);
+          });
+          
+          sourcesDiv.appendChild(sourceList);
+          messageElement.appendChild(sourcesDiv);
+        }
+        
+        // Add timestamp
+        const timeStamp = document.createElement('div');
+        timeStamp.className = 'law-chat-time';
+        timeStamp.textContent = UI.formatTime();
+        messageElement.appendChild(timeStamp);
+        
+        // Add to chat
         DOM.elements.messages.appendChild(messageElement);
         DOM.scrollToBottom();
         
         // Update chat history
         ChatFlow.history.push({
-          role: "user",
+          role: "assistant",
           content: content
         });
-        return;
-      }
-      
-      // For bot messages, show typing and delay
-      UI.showTypingIndicator();
-      
-      // Calculate appropriate delay
-      const delay = options ? 
-        UI.getRandomDelay() : 
-        UI.calculateTypingDelay(content, 2000, 5000, UI.apiLatency);
-      
-      // Create timer for delay
-      setTimeout(() => {
-        UI.hideTypingIndicator();
-        
-        const messageClass = 'law-chat-message-bot';
-        const messageTime = UI.formatTime();
-        
-        const messageElement = document.createElement('div');
-        messageElement.className = `law-chat-message ${messageClass}`;
-        
-        let messageHTML = `<div class="law-chat-bubble-content">${content}</div>`;
-        
-        // Add options if provided
-        if (options) {
-          messageHTML += `
-            <div class="law-chat-options">
-              ${options.map(option => 
-                `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`
-              ).join('')}
-            </div>
-          `;
-        }
-        
-        messageHTML += `<div class="law-chat-time">${messageTime}</div>`;
-        messageElement.innerHTML = messageHTML;
-        
-        DOM.elements.messages.appendChild(messageElement);
-        DOM.scrollToBottom();
-        
-        // Add click event listeners to options
-        if (options) {
-          const optionElements = messageElement.querySelectorAll('.law-chat-option');
-          optionElements.forEach(optionElement => {
-            optionElement.addEventListener('click', function() {
-              const selectedValue = this.getAttribute('data-value');
-              const selectedText = this.textContent;
-              ChatFlow.handleOptionSelection(selectedValue, selectedText);
-            });
-          });
-        }
-        
-        // Update chat history for non-option messages
-        if (!options) {
-          ChatFlow.history.push({
-            role: "assistant",
-            content: content
-          });
-        }
-      }, delay);
-
-        if (!isUser && !options) {
-      // Use a longer timeout to ensure all DOM updates and animations are complete
-      setTimeout(() => {
-        this.disableCompletedOptions();
-      }, 500);
+      },
+    // Add a message to the chat
+    // Add these methods to the Messages module
+addMessage(content, isUser, options = null, isThinking = false) {
+  // For user messages, add immediately
+  if (isUser) {
+    const messageClass = 'law-chat-message-user';
+    const messageTime = UI.formatTime();
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `law-chat-message ${messageClass}`;
+    
+    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
+    messageElement.innerHTML = messageContent;
+    
+    DOM.elements.messages.appendChild(messageElement);
+    DOM.scrollToBottom();
+    
+    // Update chat history
+    ChatFlow.history.push({
+      role: "user",
+      content: content
+    });
+    return;
+  }
+  
+  // If this is a thinking message, add a special class
+  if (isThinking) {
+    const messageClass = 'law-chat-message-bot law-chat-thinking-message';
+    const messageTime = UI.formatTime();
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `law-chat-message ${messageClass}`;
+    
+    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
+    messageElement.innerHTML = messageContent;
+    
+    DOM.elements.messages.appendChild(messageElement);
+    DOM.scrollToBottom();
+    return;
+  }
+  
+  // For bot messages, show typing and delay (keep the existing code for non-API responses)
+  UI.showTypingIndicator();
+  
+  // Create timer for delay
+  setTimeout(() => {
+    UI.hideTypingIndicator();
+    
+    const messageClass = 'law-chat-message-bot';
+    const messageTime = UI.formatTime();
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `law-chat-message ${messageClass}`;
+    
+    let messageHTML = `<div class="law-chat-bubble-content">${content}</div>`;
+    
+    // Add options if provided
+    if (options) {
+      messageHTML += `
+        <div class="law-chat-options">
+          ${options.map(option => 
+            `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`
+          ).join('')}
+        </div>
+      `;
     }
-    },
+    
+    messageHTML += `<div class="law-chat-time">${messageTime}</div>`;
+    messageElement.innerHTML = messageHTML;
+    
+    DOM.elements.messages.appendChild(messageElement);
+    DOM.scrollToBottom();
+    
+    // Add click event listeners to options
+    if (options) {
+      const optionElements = messageElement.querySelectorAll('.law-chat-option');
+      optionElements.forEach(optionElement => {
+        optionElement.addEventListener('click', function() {
+          const selectedValue = this.getAttribute('data-value');
+          const selectedText = this.textContent;
+          ChatFlow.handleOptionSelection(selectedValue, selectedText);
+        });
+      });
+    }
+    
+    // Update chat history for non-option messages
+    if (!options) {
+      ChatFlow.history.push({
+        role: "assistant",
+        content: content
+      });
+    }
+  }, 0); // No delay - immediate response
+},
+
+// Add method to remove thinking message
+removeThinkingMessage() {
+  const thinkingMessage = document.querySelector('.law-chat-thinking-message');
+  if (thinkingMessage && thinkingMessage.parentNode) {
+    thinkingMessage.parentNode.removeChild(thinkingMessage);
+  }
+},
     
     // Add recommendations with content
     addMessageWithRecommendations(content, recommendations) {
@@ -1747,6 +1830,8 @@
     userLocation: null,
     userName: null,
     history: [],
+    conversationId: null,
+    caseDetailsProvided: false,
 
     disablePreviousOptions(selectedOption) {
       if (!selectedOption) return;
@@ -1766,30 +1851,47 @@
     },
     
     // Process user's direct text input
-    handleUserMessage(message) {
-      // Add message to UI
-      Messages.addMessage(message, true);
+// Update this method in the ChatFlow module
+// Update this method in the ChatFlow module
+// Update the ChatFlow.handleUserMessage method
+handleUserMessage(message) {
+  console.log("Handling user message:", message, "Stage:", this.stage);
+  
+  // Add message to UI
+  Messages.addMessage(message, true);
+  
+  // Process based on current stage
+  if (this.stage === 'qualified') {
+    console.log("User is qualified, handling message");
+    
+    // Check if this is the first message after qualification (case description)
+    if (!this.caseDetailsProvided) {
+      console.log("First case details - sending to DocsBots with resources option");
+      this.caseDetailsProvided = true;
       
-      // Process based on current stage
-      if (this.stage === 'qualified') {
-        // User is qualified, send to AI
-        API.sendMessageToOpenAI(message);
-      } else if (this.stage === 'initial') {
-        // User hasn't selected case type yet, remind them to do so
-        Messages.addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
-          { value: 'personal-injury', text: 'Personal Injury' },
-          { value: 'criminal-defense', text: 'Criminal Defense' },
-          { value: 'divorce', text: 'Divorce' }
-        ]);
-      } else if (this.stage === 'caseType') {
-        // User hasn't selected location yet
-        Messages.addMessage("Thank you. Before we continue, please let me know if your case is in Kansas or Missouri:", false, [
-          { value: 'kansas', text: 'Kansas' },
-          { value: 'missouri', text: 'Missouri' },
-          { value: 'other', text: 'Other State' }
-        ]);
-      }
-    },
+      // Call DocsBots API for the first case description with showResources flag
+      API.sendMessageToDocsBot(message, true);
+    } else {
+      console.log("Regular conversation - sending to DocsBots");
+      // For all subsequent messages, use the API without resources
+      API.sendMessageToDocsBot(message, false);
+    }
+  } else if (this.stage === 'initial') {
+    // User hasn't selected case type yet
+    Messages.addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
+      { value: 'personal-injury', text: 'Personal Injury' },
+      { value: 'criminal-defense', text: 'Criminal Defense' },
+      { value: 'divorce', text: 'Divorce' }
+    ]);
+  } else if (this.stage === 'caseType') {
+    // User hasn't selected location yet
+    Messages.addMessage("Thank you. Before we continue, please let me know if your case is in Kansas or Missouri:", false, [
+      { value: 'kansas', text: 'Kansas' },
+      { value: 'missouri', text: 'Missouri' },
+      { value: 'other', text: 'Other State' }
+    ]);
+  }
+},
     
     // Process option button selection
     // Modify the handleOptionSelection method
@@ -1868,14 +1970,16 @@
         setTimeout(() => {
           this.disablePreviousOptions(selectedOption);
         }, 100);
-      } else if (this.stage === 'disclaimer') {
+      } // Update this part in ChatFlow.handleOptionSelection
+      else if (this.stage === 'disclaimer') {
         if (value === 'agree') {
           // User agreed to disclaimer, now they're qualified
           this.stage = 'qualified';
+          this.caseDetailsProvided = false; // Reset this flag for the new conversation
           Messages.addMessage("Thank you. Could you tell me a little bit about your case?", false);
         } else {
           // User did not agree
-          Messages.addMessage("I understand. Without your agreement, we cannot continue the consultation. If you change your mind or have other questions, please feel free to chat with us again.", false);
+          Messages.addMessage("I understand. Without your agreement, I cannot continue helping you. If you change your mind or have other questions, please feel free to chat with us again.", false);
           // Leave at disclaimer stage
         }
         
@@ -1928,466 +2032,530 @@
   };
   
   // API Module - handles all API calls to external services
-  const API = {
-    // Send message to OpenAI
-    async sendMessageToOpenAI(message) {
-      UI.showTypingIndicator();
+// Replace the previous API implementation with these methods
+const API = {
+  // Method to get resources for the first case description
+  async getResourcesForCase(message) {
+  UI.showTypingIndicator();
+  const startTime = Date.now();
+  
+  try {
+    // Generate a conversationId if not exists
+    if (!ChatFlow.conversationId) {
+      ChatFlow.conversationId = this.generateUUID();
+    }
+    
+    // DocsBots API Request for resources
+    const requestBody = {
+      conversationId: ChatFlow.conversationId,
+      question: message,
+      metadata: { 
+        name: ChatFlow.userName || "Visitor", 
+        caseType: ChatFlow.userCaseType || "",
+        location: ChatFlow.userLocation || "" 
+      },
+      context_items: 5,
+      human_escalation: false,
+      followup_rating: false,
+      document_retriever: true,
+      full_source: true, // Get full source content
+      stream: false // Don't stream for resource lookup
+    };
+    
+    // Make the API request to DocsBots
+    const response = await fetch(`https://api.docsbot.ai/teams/${Config.docsbot.teamId}/bots/${Config.docsbot.botId}/chat-agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Config.docsbot.apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`DocsBots API error: ${response.status}`);
+    }
+    
+    const responseData = await response.json();
+    UI.hideTypingIndicator();
+    
+    // Extract sources from the response - handle both array and object response formats
+    let sources = [];
+    if (Array.isArray(responseData)) {
+      // If responseData is an array, iterate through it
+      for (const event of responseData) {
+        if (event.event === 'lookup_answer' && event.data && event.data.sources) {
+          sources = event.data.sources;
+          break;
+        }
+      }
+    } else if (typeof responseData === 'object' && responseData !== null) {
+      // If responseData is an object, check if it has a data property with sources
+      if (responseData.data && responseData.data.sources) {
+        sources = responseData.data.sources;
+      } else if (responseData.sources) {
+        sources = responseData.sources;
+      }
+    }
+    
+    // Convert sources to recommendations format
+    if (sources && sources.length > 0) {
+      const recommendations = sources.slice(0, 3).map(source => ({
+        title: source.title || "Resource",
+        url: source.url || "#",
+        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
+        category: ChatFlow.userCaseType || "Legal"
+      }));
       
-      // Record start time for latency calculation
-      const startTime = Date.now();
+      // Display recommendations
+      if (recommendations.length > 0) {
+        Messages.addOnlyRecommendations(recommendations);
+        UI.recommendationsShown = true;
+      }
+    } else {
+      // Fallback to dummy recommendations if no sources
+      const fallbackRecommendations = this.getDummyRecommendations(message);
+      if (fallbackRecommendations.length > 0) {
+        Messages.addOnlyRecommendations(fallbackRecommendations);
+        UI.recommendationsShown = true;
+      }
+    }
+    
+    // Add transition message after showing resources
+    setTimeout(() => {
+      const transitionMessage = "Thanks for sharing details about your case. Above are some resources we've written that might be helpful. It's always best to talk with one of our attorneys who can give advice tailored to your specific situation. We'd be happy to give you a call to discuss this further. In the meantime, feel free to ask me any questions, and I'll answer them!";
+      Messages.addMessage(transitionMessage, false);
       
-      // Check if this is the first substantive message about the case
-      // and we haven't sent the transition message yet
-      const isFirstCaseDetail = !UI.transitionMessageSent && 
-                       ChatFlow.stage === 'qualified' &&
-                       message.length > 5 &&
-                       !message.toLowerCase().includes("hello") &&
-                       !message.toLowerCase().includes("hi") &&
-                       !message.toLowerCase().includes("hey");
+      // Update history with user message and transition message
+      ChatFlow.history.push({ role: "user", content: message });
+      ChatFlow.history.push({ role: "assistant", content: transitionMessage });
+    }, 1000);
+    
+    UI.apiLatency = Date.now() - startTime;
+  } catch (error) {
+    console.error("Error fetching resources:", error);
+    UI.apiLatency = Date.now() - startTime;
+    UI.hideTypingIndicator();
+    
+    // Fallback to dummy recommendations
+    const fallbackRecommendations = this.getDummyRecommendations(message);
+    if (fallbackRecommendations.length > 0) {
+      Messages.addOnlyRecommendations(fallbackRecommendations);
+    }
+    
+    // Add transition message
+    setTimeout(() => {
+      const transitionMessage = "Thanks for sharing details about your case. I've included some resources that might be helpful. Feel free to ask me any questions, and I'll do my best to assist you.";
+      Messages.addMessage(transitionMessage, false);
       
+      // Update history
+      ChatFlow.history.push({ role: "user", content: message });
+      ChatFlow.history.push({ role: "assistant", content: transitionMessage });
+    }, 1000);
+  }
+},
+  
+  // Method to handle normal conversation with DocsBots
+// Completely replace the API.sendMessageToDocsBot method with this basic implementation
+// Update the API.sendMessageToDocsBot method
+async sendMessageToDocsBot(message, showResources = false) {
+  console.log("Sending message to DocsBots:", message, "showResources:", showResources);
+  
+  // Show typing indicator or thinking message
+  if (message.length > 100) {
+    // For longer messages, show "Thinking..." to indicate processing
+    Messages.addMessage("Thinking...", false, null, true); // Added parameter for "thinking" state
+  } else {
+    UI.showTypingIndicator();
+  }
+  
+  try {
+    // Generate a conversationId if not exists
+    if (!ChatFlow.conversationId) {
+      ChatFlow.conversationId = this.generateUUID();
+      console.log("Generated new conversation ID:", ChatFlow.conversationId);
+    }
+    
+    // Basic DocsBots API Request - no streaming
+    const requestBody = {
+      conversationId: ChatFlow.conversationId,
+      question: message,
+      metadata: { 
+        name: ChatFlow.userName || "Visitor",
+        caseType: ChatFlow.userCaseType || "",
+        location: ChatFlow.userLocation || ""
+      },
+      document_retriever: true,
+      context_items: 10, // More context items for better answers
+      full_source: showResources, // Get full source content if showing resources
+      stream: false // No streaming
+    };
+    
+    console.log("DocsBots request payload:", requestBody);
+    
+    // Make the API request to DocsBots
+    const response = await fetch(`https://api.docsbot.ai/teams/${Config.docsbot.teamId}/bots/${Config.docsbot.botId}/chat-agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Config.docsbot.apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    console.log("DocsBots response status:", response.status);
+    
+    // If response is not OK, fall back
+    if (!response.ok) {
+      console.error("DocsBots API error:", response.status, response.statusText);
+      throw new Error(`DocsBots API error: ${response.status}`);
+    }
+    
+    const responseText = await response.text();
+    console.log("DocsBots raw response:", responseText);
+    
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Failed to parse DocsBots response as JSON:", e);
+      throw new Error("Invalid response format");
+    }
+    
+    console.log("DocsBots parsed response:", responseData);
+    
+    // Hide typing indicator or remove thinking message
+    if (message.length > 100) {
+      Messages.removeThinkingMessage();
+    } else {
+      UI.hideTypingIndicator();
+    }
+    
+    // Extract answer and sources from response
+    let answer = null;
+    let sources = [];
+    
+    // Try multiple approaches to find the answer and sources in the response
+    if (Array.isArray(responseData)) {
+      console.log("Processing array response");
+      // Find the first lookup_answer event
+      for (const event of responseData) {
+        console.log("Processing event:", event);
+        if (event && event.event === 'lookup_answer' && event.data) {
+          if (event.data.answer) {
+            answer = event.data.answer;
+            console.log("Found answer in lookup_answer event:", answer);
+          }
+          if (event.data.sources) {
+            sources = event.data.sources;
+            console.log("Found sources in lookup_answer event:", sources);
+          }
+          break;
+        }
+      }
+    } else if (responseData && typeof responseData === 'object') {
+      console.log("Processing object response");
+      // Look for answer in various places
+      if (responseData.data && responseData.data.answer) {
+        answer = responseData.data.answer;
+        console.log("Found answer in responseData.data.answer:", answer);
+        if (responseData.data.sources) {
+          sources = responseData.data.sources;
+          console.log("Found sources in responseData.data.sources:", sources);
+        }
+      } else if (responseData.answer) {
+        answer = responseData.answer;
+        console.log("Found answer in responseData.answer:", answer);
+        if (responseData.sources) {
+          sources = responseData.sources;
+          console.log("Found sources in responseData.sources:", sources);
+        }
+      }
+    }
+    
+    // If no answer found, use generic fallback
+    if (!answer) {
+      console.warn("No answer found in DocsBots response");
+      answer = "I'm sorry, but I don't have enough information to answer that question specifically. Our attorneys would be happy to discuss this during a consultation. Please call us at (913) 451-9500.";
+    }
+    
+    console.log("Final answer to display:", answer);
+    
+    // Convert sources to recommendations format if needed
+    let recommendations = [];
+    if (showResources && sources && sources.length > 0) {
+      recommendations = sources.slice(0, 3).map(source => ({
+        title: source.title || "Resource",
+        url: source.url || "#",
+        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
+        category: ChatFlow.userCaseType || "Legal"
+      }));
+      console.log("Converted sources to recommendations:", recommendations);
+    }
+    
+    // If we are showing resources and have recommendations, display them with the answer
+    if (showResources && recommendations.length > 0) {
+      console.log("Showing recommendations with answer");
+      // Show resources first
+      Messages.addOnlyRecommendations(recommendations);
+      
+      // Then show the answer
+      Messages.addMessage(answer, false);
+    } else {
+      // Just show the answer
+      console.log("Showing only answer");
+      Messages.addMessage(answer, false);
+    }
+    
+    // Update conversation history
+    ChatFlow.history.push({ role: "user", content: message });
+    ChatFlow.history.push({ role: "assistant", content: answer });
+    
+  } catch (error) {
+    console.error("Error in sendMessageToDocsBot:", error);
+    if (message.length > 100) {
+      Messages.removeThinkingMessage();
+    } else {
+      UI.hideTypingIndicator();
+    }
+    
+    // Simple fallback
+    const fallback = "I apologize, but I'm having trouble connecting to our knowledge base at the moment. For immediate assistance, please call our office at (913) 451-9500.";
+    Messages.addMessage(fallback, false);
+    
+    // Update conversation history
+    ChatFlow.history.push({ role: "user", content: message });
+    ChatFlow.history.push({ role: "assistant", content: fallback });
+  }
+},
+  
+  // Streaming response container implementation
+  createStreamingResponseContainer() {
+  UI.hideTypingIndicator();
+  
+  // Create the message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create message content container
+  const messageContent = document.createElement('div');
+  messageContent.className = 'law-chat-bubble-content';
+  messageContent.textContent = 'Thinking...'; // Start with a placeholder
+  
+  // Add timestamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = UI.formatTime();
+  
+  // Assemble the message
+  messageElement.appendChild(messageContent);
+  messageElement.appendChild(timeStamp);
+  
+  // Add to chat
+  DOM.elements.messages.appendChild(messageElement);
+  DOM.scrollToBottom();
+  
+  return {
+    // Update content as chunks arrive
+    updateContent: (text) => {
+      if (!text || !text.trim()) {
+        text = "I'm processing your question...";
+      }
+      
+      // Convert markdown to HTML if needed
       try {
-        // Handle first case detail message differently
-        if (isFirstCaseDetail) {
-          // Calculate API latency
-          UI.apiLatency = Date.now() - startTime;
-          
-          // Get recommendations if needed
-          let recommendations = [];
-          if (ChatFlow.stage === 'qualified') {
-            try {
-              // Context-aware search query
-              const searchQuery = `${ChatFlow.userCaseType} ${message}`; 
-              recommendations = await this.queryPineconeForContent(searchQuery);
-            } catch (error) {
-              console.error("Error fetching recommendations:", error);
-              recommendations = [];
-            }
-          }
-          
-          // Hide typing indicator
-          UI.hideTypingIndicator();
-          
-          // Add recommendations if available
-          if (recommendations && recommendations.length > 0) {
-            Messages.addOnlyRecommendations(recommendations);
-            UI.recommendationsShown = true;
-          }
-          
-          // Add transition message after delay
-          setTimeout(() => {
-            const transitionMessage = "Thanks for sharing details about your case. Above are some resources we've written that might be helpful. It's always best to talk with one of our attorneys who can give advice tailored to your specific situation. We'd be happy to give you a call to discuss this further. In the meantime, feel free to ask me any questions, and I'll answer them!";
-            
-            Messages.addMessage(transitionMessage, false);
-            
-            // Mark transition message as sent
-            UI.transitionMessageSent = true;
-            
-            // Add to chat history
-            ChatFlow.history.push({
-              role: "assistant",
-              content: transitionMessage
-            });
-          }, 1500);
-          
-          return;
-        }
+        // Simple markdown to HTML conversion for basic formatting
+        const formattedText = text
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>')
+          .replace(/\n\n/g, '<br><br>')
+          .replace(/\n/g, '<br>');
         
-        // This is a regular follow-up message, process with OpenAI
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Config.openai.apiKey}`
-          },
-          body: JSON.stringify({
-            model: Config.openai.model,
-            messages: [
-              {
-                role: "system",
-                content: `You are LegalAssist, an expert legal advisor for Roth Davies Law Firm in Overland Park, Kansas. Maintain a conversational, empathetic tone while being concise and focused.
-
-EXPERTISE AREAS:
-- ${ChatFlow.getCaseTypeDisplay()} cases in ${ChatFlow.getLocationDisplay()}
-- Personal Injury (contingency-based)
-- Criminal Defense
-- Family Law/Divorce
-
-RESPONSE GUIDELINES:
-- Keep responses under 60 words, using conversational language
-- Directly address what the client actually said
-- Show understanding of their specific situation
-- Demonstrate legal expertise without jargon
-- Vary your closing statements naturally
-- Only include the consultation number (913-451-9500) after developing a few additional messages of conversation, and only when relevant. Don't mention it in every response, and once you've mentioned it, don't repeat it.
-- Use contractions and natural speech patterns
-- Don't say a terminating statement like "If you have any questions or need more information, feel free to ask!" unless the other user has clearly terminated the conversation.
-- End with a question or prompt to keep the conversation going when appropriate
-
-APPROACH FOR DIFFICULT QUESTIONS:
-- Acknowledge emotional aspects first
-- Provide a brief, knowledgeable perspective on their situation
-- Suggest next steps in a way that shows your expertise
-- Never use generic disclaimers like "I can't advise on that"
-- Subtly redirect dangerous or extreme hypotheticals
-
-KEY QUALITY SIGNALS:
-- Sound like a knowledgeable legal professional chatting informally
-- Respond uniquely to each inquiry without template language
-- Show genuine understanding of legal implications
-- Convey expertise without lengthy explanations`
-              },
-              ...ChatFlow.history
-            ],
-            temperature: 0.7,
-            max_tokens: 500
-          })
-        });
-        
-        // Calculate API latency
-        UI.apiLatency = Date.now() - startTime;
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const aiResponse = data.choices[0].message.content;
-        
-        // Check for recommendations if we haven't shown them yet
-        let recommendations = [];
-        if (ChatFlow.stage === 'qualified' && !UI.recommendationsShown) {
-          // Only query for substantial follow-up messages
-          const shouldRecommendContent = ChatFlow.userCaseType && 
-            (message.length > 10) && 
-            !message.toLowerCase().includes("hello") && 
-            !message.toLowerCase().includes("thank");
-
-          if (shouldRecommendContent) {
-            try {
-              // Context-aware search query
-              const searchQuery = `${ChatFlow.userCaseType} ${message}`; 
-              recommendations = await this.queryPineconeForContent(searchQuery);
-              
-              if (recommendations && recommendations.length > 0) {
-                UI.recommendationsShown = true;
-              }
-            } catch (error) {
-              console.error("Error fetching recommendations:", error);
-              recommendations = [];
-            }
-          }
-        } else {
-          // Already shown recommendations
-          recommendations = [];
-        }
-        
-        // Hide typing indicator
-        UI.hideTypingIndicator();
-        
-        // Display response with recommendations if available
-        if (recommendations && recommendations.length > 0) {
-          Messages.addMessageWithRecommendations(aiResponse, recommendations);
-        } else {
-          Messages.addMessage(aiResponse, false);
-        }
-        
-      } catch (error) {
-        console.error("Error calling OpenAI API:", error);
-        UI.apiLatency = Date.now() - startTime;
-        UI.hideTypingIndicator();
-        
-        // Use fallback response instead
-        this.processFallbackResponse(message);
+        messageContent.innerHTML = formattedText;
+      } catch (e) {
+        // Fallback to plain text if markdown conversion fails
+        messageContent.textContent = text;
       }
+      DOM.scrollToBottom();
     },
     
-    // Process fallback response when API call fails
-    processFallbackResponse(message) {
-      UI.showTypingIndicator();
-      
-      // Default fallback
-      let response = "Thank you for your question. Our team would be happy to provide more specific information during a free consultation. Would you like us to contact you to schedule a time to talk? You can reach us at (913) 451-9500.";
-      
-      // Check message against fallback dictionary
-      const fallbackResponses = {
-        "accident": "If you've been in an accident, your health is the first priority. Seek medical attention right away, even if you feel fine - some injuries aren't immediately apparent. Then, document everything you can about the accident and call us at (913) 451-9500 for a free consultation to discuss your legal options.",
-        "worth": "Every personal injury case is unique. The value depends on factors like medical expenses, lost wages, pain and suffering, and long-term impacts. We offer a free consultation to evaluate your specific situation and give you a better understanding of what compensation you might expect.",
-        "settlement": "Most personal injury cases settle before trial, but we prepare every case as if it will go to court. This approach often leads to better settlement offers. The timeline varies from a few months to over a year depending on case complexity and the extent of your injuries.",
-        "fault": "Kansas follows a modified comparative negligence rule, meaning you can still recover damages even if you were partially at fault, as long as your fault is less than 50%. Your compensation may be reduced by your percentage of fault. We can evaluate your situation during a free consultation.",
-        "fees": "We work on a contingency fee basis, which means you pay nothing upfront, and we only get paid if we win your case. Our fee is typically a percentage of your settlement or verdict. This arrangement allows anyone to access quality legal representation regardless of their financial situation.",
-        "consultation": "We offer a free 30-minute consultation to discuss your case. You can schedule by calling (913) 451-9500. We also offer virtual consultations if that's more convenient for you.",
-        "evidence": "Important evidence in personal injury cases includes medical records, accident reports, witness statements, photographs, video footage, and documentation of lost wages. The sooner you contact us, the better we can help preserve crucial evidence for your case.",
-        "timeline": "Most personal injury cases resolve within 3-12 months, though complex cases can take longer. We work efficiently to reach a resolution while still pursuing maximum compensation for your injuries."
-      };
-      
-      // Check for keywords in the message
-      const lowercaseMessage = message.toLowerCase();
-      Object.keys(fallbackResponses).forEach(key => {
-        if (lowercaseMessage.includes(key)) {
-          response = fallbackResponses[key];
-        }
-      });
-      
-      // Add fallback response after delay
-      Messages.addMessage(response, false);
+    // Finalize message when done
+    finalize: () => {
+      // Check if the content is still empty or just the placeholder
+      if (!messageContent.textContent.trim() || 
+          messageContent.textContent === 'Thinking...' ||
+          messageContent.textContent === "I'm processing your question...") {
+        messageContent.innerHTML = "I'm sorry, but I couldn't find specific information about that in our knowledge base. For questions about criminal charges, it's best to speak directly with one of our attorneys. Please call us at (913) 451-9500 for a confidential consultation.";
+      }
+      DOM.scrollToBottom();
     },
     
-    // Submit phone number to server/SMS
-    submitPhoneNumber(phoneNumber, isReferral = false) {
-      console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
-      
-      // Format case type and location for SMS
-      const caseTypeText = ChatFlow.getCaseTypeDisplay();
-      const locationText = ChatFlow.getLocationDisplay();
-      
-      // Create message body for SMS
-      const messageBody = `Roth Davies Chatbot - New Incoming Lead: ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
-      
-      // Send SMS via Twilio API
-      fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
-        },
-        body: new URLSearchParams({
-          'To': Config.twilio.toNumber,
-          'From': Config.twilio.fromNumber,
-          'Body': messageBody
-        })
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Twilio SMS sent successfully:', data);
-      })
-      .catch(error => {
-        console.error('Error sending Twilio SMS:', error);
-        // Continue flow even if SMS fails
-      });
-      
-      // Ensure send button is enabled after submission
-      setTimeout(() => {
-        DOM.elements.send.disabled = false;
-      }, 500);
-    },
-    
-    // Query Pinecone for relevant content based on user's message
-    async queryPineconeForContent(userMessage) {
-      try {
-        console.log("Starting Pinecone query for:", userMessage);
-        
-        // Get embedding for the user's query
-        const embedding = await this.getEmbedding(userMessage);
-        if (!embedding) {
-          return [];
-        }
-        
-        // Reduce dimension to match Pinecone's expectation
-        const reducedEmbedding = this.reduceEmbeddingDimension(embedding, 768);
-        
-        // Build Pinecone URL
-        const pineconeUrl = `https://${Config.pinecone.index}-4w5mo1c.svc.aped-4627-b74a.pinecone.io/query`;
-        
-        // Build request body
-        const requestBody = {
-          vector: reducedEmbedding,
-          topK: 3,
-          includeMetadata: true
-        };
-        
-        // Make request to Pinecone
-        const pineconeResponse = await fetch(pineconeUrl, {
-          method: 'POST',
-          headers: {
-            'Api-Key': Config.pinecone.apiKey,
-            'Content-Type': 'application/json',
-            'X-Pinecone-API-Version': '2025-01'
-          },
-          body: JSON.stringify(requestBody)
-        });
-        
-        if (!pineconeResponse.ok) {
-          // Try alternative formats if standard request fails
-          return this.tryAlternativePineconeFormats(userMessage, reducedEmbedding);
-        }
-        
-        const results = await pineconeResponse.json();
-        
-        // Format results if matches found
-        if (results.matches && results.matches.length > 0) {
-          return results.matches.map(match => ({
-            title: match.metadata.title || "Related Resource",
-            url: match.metadata.url || "#",
-            snippet: match.metadata.snippet || "Information related to your case",
-            category: match.metadata.category || "Legal",
-            score: match.score
-          }));
-        }
-        
-        return [];
-      } catch (error) {
-        console.error('Error querying Pinecone:', error);
-        return []; // Return empty array on error
+    // Remove the container entirely
+    remove: () => {
+      if (messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
       }
-    },
-    
-    // Get embedding from OpenAI
-    async getEmbedding(text) {
-      try {
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Config.openai.apiKey}`
-          },
-          body: JSON.stringify({
-            input: text,
-            model: "text-embedding-ada-002"
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        return data.data[0].embedding;
-      } catch (error) {
-        console.error("Error getting embedding:", error);
-        return null;
-      }
-    },
-    
-    // Try alternative Pinecone request formats if standard fails
-    async tryAlternativePineconeFormats(userMessage, queryEmbedding) {
-      console.log("Trying alternative Pinecone request formats");
-      
-      // Different parameter variations to try
-      const variations = [
-        {
-          // Variation 1: Different field names (underscores)
-          body: {
-            vector: queryEmbedding,
-            top_k: 3,
-            include_metadata: true
-          }
-        },
-        {
-          // Variation 2: Include namespace field
-          body: {
-            vector: queryEmbedding,
-            topK: 3,
-            includeMetadata: true,
-            namespace: ""
-          }
-        },
-        {
-          // Variation 3: Include values field
-          body: {
-            vector: queryEmbedding,
-            topK: 3,
-            includeMetadata: true,
-            includeValues: false
-          }
-        }
-      ];
-      
-      const pineconeUrl = `https://${Config.pinecone.index}-4w5mo1c.svc.aped-4627-b74a.pinecone.io/query`;
-      
-      // Try each variation
-      for (let i = 0; i < variations.length; i++) {
-        try {
-          console.log(`Trying variation ${i+1}:`, variations[i].body);
-          
-          const response = await fetch(pineconeUrl, {
-            method: 'POST',
-            headers: {
-              'Api-Key': Config.pinecone.apiKey,
-              'Content-Type': 'application/json',
-              'X-Pinecone-API-Version': '2025-01'
-            },
-            body: JSON.stringify(variations[i].body)
-          });
-          
-          if (response.ok) {
-            const results = await response.json();
-            
-            if (results.matches && results.matches.length > 0) {
-              return results.matches.map(match => ({
-                title: match.metadata.title || "Related Resource",
-                url: match.metadata.url || "#",
-                snippet: match.metadata.snippet || "Information related to your case",
-                category: match.metadata.category || "Legal",
-                score: match.score
-              }));
-            }
-          }
-        } catch (error) {
-          console.error(`Error with variation ${i+1}:`, error);
-        }
-      }
-      
-      console.log("All variations failed");
-      return [];
-    },
-    
-    // Dimensionality reduction for embeddings to match Pinecone's expectations
-    reduceEmbeddingDimension(embedding, targetDimension) {
-      if (embedding.length <= targetDimension) {
-        return embedding; // No reduction needed
-      }
-      
-      // Method 1: Adaptive Pooling for pairs
-      if (embedding.length === targetDimension * 2) {
-        const reduced = [];
-        for (let i = 0; i < embedding.length; i += 2) {
-          // Weighted average of adjacent dimensions
-          const combined = (embedding[i] * 0.6 + embedding[i + 1] * 0.4);
-          reduced.push(combined);
-        }
-        return reduced;
-      }
-      
-      // Method 2: Mixed approach for odd ratios
-      const firstHalf = embedding.slice(0, Math.ceil(embedding.length / 2));
-      const secondHalf = embedding.slice(Math.ceil(embedding.length / 2));
-      
-      const elementsFromEachHalf = Math.ceil(targetDimension / 2);
-      
-      const strideFirst = Math.floor(firstHalf.length / elementsFromEachHalf);
-      const strideSecond = Math.floor(secondHalf.length / elementsFromEachHalf);
-      
-      const reduced = [];
-      
-      // Add elements from first half with stride
-      for (let i = 0; i < firstHalf.length && reduced.length < elementsFromEachHalf; i += strideFirst) {
-        reduced.push(firstHalf[i]);
-      }
-      
-      // Add elements from second half with stride
-      for (let i = 0; i < secondHalf.length && reduced.length < targetDimension; i += strideSecond) {
-        reduced.push(secondHalf[i]);
-      }
-      
-      // If needed, add remaining elements
-      while (reduced.length < targetDimension) {
-        const index = reduced.length % embedding.length;
-        reduced.push(embedding[index]);
-      }
-      
-      // Normalize the reduced embedding to maintain similar magnitude
-      const originalMagnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-      const reducedMagnitude = Math.sqrt(reduced.reduce((sum, val) => sum + val * val, 0));
-      const scaleFactor = originalMagnitude / reducedMagnitude;
-      
-      return reduced.map(val => val * scaleFactor);
     }
   };
+},
+  
+  // UUID generator
+  generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  },
+  
+  // Fallback recommendations
+  getDummyRecommendations(message) {
+    const lowercaseMessage = message.toLowerCase();
+    
+    // Base set of recommendations that might be relevant
+    const recommendations = [
+      {
+        title: "Car Accident Claims Guide",
+        url: "/car-accident-claims-guide",
+        snippet: "Learn about the steps to take after a car accident and how to maximize your compensation.",
+        category: "Personal Injury"
+      },
+      {
+        title: "Kansas Personal Injury Statute of Limitations",
+        url: "/personal-injury-statute-of-limitations",
+        snippet: "Important time limits for filing personal injury claims in Kansas.",
+        category: "Personal Injury"
+      },
+      {
+        title: "Drunk Driving Accidents: Victim's Rights",
+        url: "/drunk-driving-victim-rights",
+        snippet: "Information about your legal rights when injured by an intoxicated driver.",
+        category: "Personal Injury"
+      }
+    ];
+    
+    // Return a subset of recommendations based on keywords
+    const keywordMap = {
+      "drunk": 2, // Index of drunk driving article
+      "hit": 0,   // Index of car accident guide
+      "accident": 0,
+      "compensation": 0,
+      "time": 1,   // Index of statute of limitations
+      "deadline": 1,
+      "kansas": 1,
+      "missouri": 1
+    };
+    
+    // Check for keywords in the message
+    const matchedIndices = new Set();
+    Object.keys(keywordMap).forEach(keyword => {
+      if (lowercaseMessage.includes(keyword)) {
+        matchedIndices.add(keywordMap[keyword]);
+      }
+    });
+    
+    // If specific keywords were found, return those recommendations
+    if (matchedIndices.size > 0) {
+      return Array.from(matchedIndices).map(index => recommendations[index]);
+    }
+    
+    // If no specific keywords matched, return random 1-2 recommendations
+    return recommendations.slice(0, Math.floor(Math.random() * 2) + 1);
+  },
+  
+  // Process fallback response when API call fails
+  processFallbackResponse(message) {
+  UI.showTypingIndicator();
+  
+  // Default fallback
+  let response = "Thank you for your question. Our team would be happy to provide more specific information during a free consultation. Would you like us to contact you to schedule a time to talk? You can reach us at (913) 451-9500.";
+  
+  // Check message against fallback dictionary
+  const fallbackResponses = {
+    "accident": "If you've been in an accident, your health is the first priority. Seek medical attention right away, even if you feel fine - some injuries aren't immediately apparent. Then, document everything you can about the accident and call us at (913) 451-9500 for a free consultation to discuss your legal options.",
+    "worth": "Every personal injury case is unique. The value depends on factors like medical expenses, lost wages, pain and suffering, and long-term impacts. We offer a free consultation to evaluate your specific situation and give you a better understanding of what compensation you might expect.",
+    "settlement": "Most personal injury cases settle before trial, but we prepare every case as if it will go to court. This approach often leads to better settlement offers. The timeline varies from a few months to over a year depending on case complexity and the extent of your injuries.",
+    "fault": "Kansas follows a modified comparative negligence rule, meaning you can still recover damages even if you were partially at fault, as long as your fault is less than 50%. Your compensation may be reduced by your percentage of fault. We can evaluate your situation during a free consultation.",
+    "fees": "We work on a contingency fee basis, which means you pay nothing upfront, and we only get paid if we win your case. Our fee is typically a percentage of your settlement or verdict. This arrangement allows anyone to access quality legal representation regardless of their financial situation.",
+    "consultation": "We offer a free 30-minute consultation to discuss your case. You can schedule by calling (913) 451-9500. We also offer virtual consultations if that's more convenient for you.",
+    "evidence": "Important evidence in personal injury cases includes medical records, accident reports, witness statements, photographs, video footage, and documentation of lost wages. The sooner you contact us, the better we can help preserve crucial evidence for your case.",
+    "timeline": "Most personal injury cases resolve within 3-12 months, though complex cases can take longer. We work efficiently to reach a resolution while still pursuing maximum compensation for your injuries.",
+    "drug": "Drug charges can have serious consequences, including potential jail time, fines, and a permanent criminal record that may affect your future employment and housing opportunities. The severity depends on the type and quantity of drugs involved, as well as your prior record. We recommend scheduling a confidential consultation with one of our criminal defense attorneys at (913) 451-9500 to discuss your specific situation.",
+    "coke": "Drug possession charges can have serious consequences, even for first-time offenders. The penalties depend on the amount, your prior record, and other factors. Every case is unique, and it's important to get personalized legal advice. Our criminal defense attorneys can evaluate your situation and explain your options during a confidential consultation. Please call us at (913) 451-9500 to discuss your case."
+  };
+  
+  // Check for keywords in the message
+  const lowercaseMessage = message.toLowerCase();
+  Object.keys(fallbackResponses).forEach(key => {
+    if (lowercaseMessage.includes(key)) {
+      response = fallbackResponses[key];
+    }
+  });
+  
+  // Special handling for sensitive criminal matters or drug references
+  if (lowercaseMessage.includes("drugs") || 
+      lowercaseMessage.includes("caught") || 
+      lowercaseMessage.includes("arrest") || 
+      lowercaseMessage.includes("trouble") ||
+      lowercaseMessage.includes("jail") ||
+      lowercaseMessage.includes("prison")) {
+    response = "I understand your concern. Criminal charges can be serious, and the consequences vary based on many factors specific to your situation. For legal issues of this nature, it's best to speak directly with one of our attorneys who can provide confidential guidance. Please call us at (913) 451-9500 to schedule a consultation where we can discuss your case in detail.";
+  }
+  
+  // Add fallback response after delay
+  setTimeout(() => {
+    Messages.addMessage(response, false);
+    
+    // Update conversation history
+    ChatFlow.history.push({ role: "user", content: message });
+    ChatFlow.history.push({ role: "assistant", content: response });
+  }, UI.getRandomDelay(800, 1200));
+},
+  
+  // Submit phone number to server/SMS
+  submitPhoneNumber(phoneNumber, isReferral = false) {
+    console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+    
+    // Format case type and location for SMS
+    const caseTypeText = ChatFlow.getCaseTypeDisplay();
+    const locationText = ChatFlow.getLocationDisplay();
+    
+    // Create message body for SMS
+    const messageBody = `Roth Davies Chatbot - New Incoming Lead: ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
+    
+    // Send SMS via Twilio API
+    fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
+      },
+      body: new URLSearchParams({
+        'To': Config.twilio.toNumber,
+        'From': Config.twilio.fromNumber,
+        'Body': messageBody
+      })
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('Twilio SMS sent successfully:', data);
+    })
+    .catch(error => {
+      console.error('Error sending Twilio SMS:', error);
+      // Continue flow even if SMS fails
+    });
+    
+    // Ensure send button is enabled after submission
+    setTimeout(() => {
+      DOM.elements.send.disabled = false;
+    }, 500);
+  }
+};
   
   // Initialize the application
   DOM.initialize();
