@@ -20,7 +20,7 @@
     accountSid: siteConfig.twilio?.accountSid || "",
     authToken: siteConfig.twilio?.authToken || "", 
     fromNumber: siteConfig.twilio?.fromNumber || "+19133956075",
-    toNumber: siteConfig.twilio?.toNumber || "+19136020456"
+    toNumber: siteConfig.twilio?.toNumber || "+19134753876"
     },
     videos: {
     default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
@@ -168,26 +168,6 @@
     notification: document.querySelector(selectors.notification)
   };
   
-  // Improved auto-resize textarea functionality
-// Updated textarea auto-resize functionality
-// Improved textarea auto-resize functionality that maintains consistent line utilization
-// Revised textarea auto-resize functionality with proper one-line baseline
-// Simplified but effective textarea auto-resize functionality
-// Precision textarea auto-resize functionality
-// Refined textarea auto-resize functionality using hidden DOM for measurement
-// Refined textarea auto-resize functionality - fixed initial expansion issue
-// Refined textarea auto-resize functionality - consistent expansion across all lines
-// Simple, reliable textarea auto-resize functionality
-// Fine-tuned textarea auto-resize implementation with consistent expansion
-// Fixed textarea auto-resize implementation
-// Direct textarea auto-resize implementation with forced reflow
-// Fixed textarea auto-resize implementation that correctly handles single lines
-// Fixed textarea auto-resize implementation with consistent single line behavior
-// Simplified and direct textarea auto-resize implementation
-// Modified textarea auto-resize implementation - fixed for short text
-// Back to basics textarea auto-resize implementation
-// Fixed textarea auto-resize implementation with character-based approach for first line
-// Replace the existing textarea auto-resize implementation in DOM.cacheElements()
 this.elements.input.addEventListener('input', () => {
   // Store current text
   const text = this.elements.input.value;
@@ -2767,50 +2747,50 @@ ChatFlow.history.push({ role: "user", content: message });
   }, UI.getRandomDelay(800, 1200));
 },
   
-  // Submit phone number to server/SMS
-  submitPhoneNumber(phoneNumber, isReferral = false) {
-    console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
-    
-    // Format case type and location for SMS
-    const caseTypeText = ChatFlow.getCaseTypeDisplay();
-    const locationText = ChatFlow.getLocationDisplay();
-    
-    // Create message body for SMS
-    const messageBody = `Roth Davies Chatbot - New Incoming Lead: ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
-    
-    // Send SMS via Twilio API
-    fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
-      },
-      body: new URLSearchParams({
-        'To': Config.twilio.toNumber,
-        'From': Config.twilio.fromNumber,
-        'Body': messageBody
-      })
+// Submit phone number to server/SMS
+submitPhoneNumber(phoneNumber, isReferral = false) {
+  console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+  
+  // Format case type and location for SMS
+  const caseTypeText = ChatFlow.getCaseTypeDisplay();
+  const locationText = ChatFlow.getLocationDisplay();
+  const nameText = ChatFlow.userName || "Unknown"; // Get the user's name, default to "Unknown" if not available
+  
+  // Create message body for SMS with name included
+  const messageBody = `Roth Davies Chatbot - New Incoming Client: ${nameText} - ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
+  
+  // Send SMS via Twilio API
+  fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
+    },
+    body: new URLSearchParams({
+      'To': Config.twilio.toNumber,
+      'From': Config.twilio.fromNumber,
+      'Body': messageBody
     })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Twilio SMS sent successfully:', data);
-    })
-    .catch(error => {
-      console.error('Error sending Twilio SMS:', error);
-      // Continue flow even if SMS fails
-    });
-    
-    // Ensure send button is enabled after submission
-    setTimeout(() => {
-      DOM.elements.send.disabled = false;
-    }, 500);
-  }
-};
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('Twilio SMS sent successfully:', data);
+  })
+  .catch(error => {
+    console.error('Error sending Twilio SMS:', error);
+    // Continue flow even if SMS fails
+  });
+  
+  // Ensure send button is enabled after submission
+  setTimeout(() => {
+    DOM.elements.send.disabled = false;
+  }, 500);
+}};
   
   // Initialize the application
   DOM.initialize();
