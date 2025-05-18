@@ -168,41 +168,52 @@
     notification: document.querySelector(selectors.notification)
   };
   
-  // Improved auto-resize textarea functionality
-  this.elements.input.addEventListener('input', () => {
-    // Store the current scroll height
-    const previousScrollHeight = this.elements.input.scrollHeight;
+this.elements.input.addEventListener('input', () => {
+  // Store current text
+  const text = this.elements.input.value;
+  
+  // For empty text, reset to single line height
+  if (!text) {
+    this.elements.input.style.height = '24px';
+    return;
+  }
+  
+  // Save the original height
+  const originalHeight = this.elements.input.style.height || '24px';
+  
+  // Reset to measure how much space is actually needed
+  this.elements.input.style.height = '24px';
+  
+  // Check if content overflows the single line
+  const hasOverflow = this.elements.input.scrollHeight > this.elements.input.clientHeight;
+  
+  if (hasOverflow) {
+    // Text doesn't fit in one line
     
-    // Reset height to auto so we can accurately determine needed height
-    this.elements.input.style.height = 'auto';
+    // Count actual newlines
+    const newlineCount = (text.match(/\n/g) || []).length;
     
-    // Calculate the number of characters per line (approximation)
-    const inputWidth = this.elements.input.clientWidth;
-    const avgCharWidth = 8; // Average character width in pixels (approximate)
-    const charsPerLine = Math.floor(inputWidth / avgCharWidth) * 0.95; // 95% of total width
+    // Calculate height based on newlines (plus 1 for the first line)
+    const lineHeight = 24;
+    const neededRows = newlineCount + 1;
+    const calculatedHeight = Math.min(120, neededRows * lineHeight);
     
-    // Only expand if text would wrap to next line
-    const text = this.elements.input.value;
-    const needsExpansion = text.length > charsPerLine || text.includes('\n');
+    // Set exact height for needed lines
+    this.elements.input.style.height = `${calculatedHeight}px`;
     
-    // Calculate the appropriate height
-    let newHeight;
-    if (needsExpansion) {
-      // Set height based on scrollHeight but with limits
-      newHeight = Math.min(120, Math.max(24, this.elements.input.scrollHeight));
-    } else {
-      // Keep single line height
-      newHeight = 24;
+    // Check again for overflow after setting to calculated height
+    // This handles the case where a line is longer than the width
+    if (this.elements.input.scrollHeight > this.elements.input.clientHeight) {
+      this.elements.input.style.height = `${Math.min(120, this.elements.input.scrollHeight)}px`;
     }
-    
-    // Apply the new height
-    this.elements.input.style.height = `${newHeight}px`;
-    
-    // If height increased, scroll to bottom of messages
-    if (newHeight > previousScrollHeight) {
-      this.scrollToBottom();
-    }
-  });
+  } else {
+    // Content fits in one line, keep it at one line
+    this.elements.input.style.height = '24px';
+  }
+  
+  // Scroll chat to bottom
+  this.scrollToBottom();
+});
 },
     
     setupEventListeners() {
@@ -291,6 +302,35 @@
           font-family: 'Arial', sans-serif;
           position: fixed;
           z-index: 9999;
+        }
+
+        /* Typing effect animations */
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        .law-chat-bubble-content {
+          animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .law-chat-typing {
+          transition: opacity 0.3s ease-in-out;
+        }
+
+        /* Typing effect styles */
+        .law-chat-typed-word {
+          display: inline;
+          opacity: 0;
+          transition: opacity 0.3s ease-in-out;
+        }
+
+        .law-chat-bubble-content {
+          line-height: 1.5;
         }
         
         /* Chat Bubble - Enhanced with glowing effect and text */
@@ -1153,6 +1193,110 @@
   
   // Messages Module - handles message creation, display, and user interactions
   const Messages = {
+
+    // Add this method to the Messages module
+// Add this method to the Messages module
+// Updated typing effect method with fade-in
+// Updated typing effect method with slower speed and fixed duplication issue
+addMessageWithTypingEffect(content, isUser) {
+  // For user messages, add immediately without typing effect
+  if (isUser) {
+    this.addMessage(content, true);
+    return;
+  }
+  
+  UI.showTypingIndicator();
+  
+  // Create a short delay before starting the typing effect
+  setTimeout(() => {
+    UI.hideTypingIndicator();
+    
+    // Create the message element
+    const messageElement = document.createElement('div');
+    messageElement.className = 'law-chat-message law-chat-message-bot';
+    
+    // Create message content container
+    const messageContent = document.createElement('div');
+    messageContent.className = 'law-chat-bubble-content';
+    messageContent.innerHTML = ''; // Start empty
+    messageElement.appendChild(messageContent);
+    
+    // Add timestamp
+    const timeStamp = document.createElement('div');
+    timeStamp.className = 'law-chat-time';
+    timeStamp.textContent = UI.formatTime();
+    messageElement.appendChild(timeStamp);
+    
+    // Add to chat
+    DOM.elements.messages.appendChild(messageElement);
+    DOM.scrollToBottom();
+    
+    // Calculate a much slower typing speed
+    const totalChars = content.length;
+    const minDuration = 4000; // Minimum 4 seconds for very short messages
+    const maxDuration = 12000; // Maximum 12 seconds for very long messages
+    
+    // Scale duration based on content length
+    const targetDuration = Math.min(maxDuration, 
+      minDuration + (totalChars / 10) * 50); // Much slower scaling
+    
+    // Divide content into words for more natural typing
+    const words = content.split(/\s+/);
+    const totalWords = words.length;
+    
+    // Calculate time per word to achieve target duration
+    const timePerWord = targetDuration / totalWords;
+    
+    let displayedWords = 0;
+    
+    const typeNextWord = () => {
+      if (displayedWords >= totalWords) {
+        // Typing complete
+        // IMPORTANT: Only update the chat history here, don't add another message
+        ChatFlow.history.push({
+          role: "assistant",
+          content: content
+        });
+        return;
+      }
+      
+      // Create a container for the new word with fade-in effect
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'law-chat-typed-word';
+      
+      // Add proper spacing between words
+      if (displayedWords > 0) {
+        wordSpan.textContent = ' ' + words[displayedWords];
+      } else {
+        wordSpan.textContent = words[displayedWords];
+      }
+      
+      wordSpan.style.opacity = '0';
+      
+      // Append the word to the message
+      messageContent.appendChild(wordSpan);
+      
+      // Trigger the fade-in effect
+      setTimeout(() => {
+        wordSpan.style.opacity = '1';
+      }, 10);
+      
+      // Move to next word
+      displayedWords++;
+      
+      // Schedule the next word with more variation for natural effect
+      // Base timing is slower, plus 20-100% random variation
+      const baseDelay = timePerWord;
+      const randomFactor = 0.2 + (Math.random() * 0.8); // 20-100% variation
+      setTimeout(typeNextWord, baseDelay * randomFactor);
+      
+      DOM.scrollToBottom();
+    };
+    
+    // Start the typing effect
+    setTimeout(typeNextWord, 200);
+  }, 300);
+},
 
 // Add this method to the Messages module
 addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
@@ -2378,31 +2522,33 @@ if (sources && sources.length > 0) {
   console.log("Unique sources to display:", uniqueSources);
 }
 
-// First add the answer to the chat
-Messages.addMessage(answer, false);
-
-// If we have unique sources and at least one is new, display them in the resources bubble
 if (uniqueSources && uniqueSources.length > 0 && !allSourcesAlreadyShown) {
   console.log("Adding recommendations bubble with sources:", uniqueSources);
   
-  // Determine the appropriate heading based on whether this is the first recommendation
+  // Determine the appropriate heading
   let headingText;
   if (!API.firstRecommendationShown) {
     headingText = "Our attorneys wrote these resources for you:";
-    API.firstRecommendationShown = true; // Mark that we've shown the first recommendation
+    API.firstRecommendationShown = true;
   } else {
     headingText = "Based on the conversation, this resource may be tailored to you too:";
   }
   
+  // Add the recommendations immediately
+  Messages.addOnlyRecommendationsWithCustomHeading(uniqueSources, headingText);
+  
+  // Short delay before starting the typing effect of the main response
   setTimeout(() => {
-    // Use the custom heading method with the appropriate heading
-    Messages.addOnlyRecommendationsWithCustomHeading(uniqueSources, headingText);
-  }, 100); // Small delay to ensure the message is processed first
+    // Add the answer to the chat with typing effect
+    Messages.addMessageWithTypingEffect(answer, false);
+  }, 300);
+} else {
+  // No recommendations to show, just add the answer with typing effect
+  Messages.addMessageWithTypingEffect(answer, false);
 }
 
-// Update conversation history
+// Only update user message in chat history, the bot response is updated in the typing effect
 ChatFlow.history.push({ role: "user", content: message });
-ChatFlow.history.push({ role: "assistant", content: answer });
     
   } catch (error) {
     console.error("Error in sendMessageToDocsBot:", error);
@@ -2601,50 +2747,50 @@ ChatFlow.history.push({ role: "assistant", content: answer });
   }, UI.getRandomDelay(800, 1200));
 },
   
-  // Submit phone number to server/SMS
-  submitPhoneNumber(phoneNumber, isReferral = false) {
-    console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
-    
-    // Format case type and location for SMS
-    const caseTypeText = ChatFlow.getCaseTypeDisplay();
-    const locationText = ChatFlow.getLocationDisplay();
-    
-    // Create message body for SMS
-    const messageBody = `Roth Davies Chatbot - New Incoming Lead: ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
-    
-    // Send SMS via Twilio API
-    fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
-      },
-      body: new URLSearchParams({
-        'To': Config.twilio.toNumber,
-        'From': Config.twilio.fromNumber,
-        'Body': messageBody
-      })
+// Submit phone number to server/SMS
+submitPhoneNumber(phoneNumber, isReferral = false) {
+  console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+  
+  // Format case type and location for SMS
+  const caseTypeText = ChatFlow.getCaseTypeDisplay();
+  const locationText = ChatFlow.getLocationDisplay();
+  const nameText = ChatFlow.userName || "Unknown"; // Get the user's name, default to "Unknown" if not available
+  
+  // Create message body for SMS with name included
+  const messageBody = `Roth Davies Chatbot - New Incoming Client: ${nameText} - ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
+  
+  // Send SMS via Twilio API
+  fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
+    },
+    body: new URLSearchParams({
+      'To': Config.twilio.toNumber,
+      'From': Config.twilio.fromNumber,
+      'Body': messageBody
     })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('Twilio SMS sent successfully:', data);
-    })
-    .catch(error => {
-      console.error('Error sending Twilio SMS:', error);
-      // Continue flow even if SMS fails
-    });
-    
-    // Ensure send button is enabled after submission
-    setTimeout(() => {
-      DOM.elements.send.disabled = false;
-    }, 500);
-  }
-};
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('Twilio SMS sent successfully:', data);
+  })
+  .catch(error => {
+    console.error('Error sending Twilio SMS:', error);
+    // Continue flow even if SMS fails
+  });
+  
+  // Ensure send button is enabled after submission
+  setTimeout(() => {
+    DOM.elements.send.disabled = false;
+  }, 500);
+}};
   
   // Initialize the application
   DOM.initialize();
