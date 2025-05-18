@@ -11,9 +11,9 @@
   const Config = {
     // API keys - merged with defaults
     docsbot: {
-      teamId: siteConfig.docsbot?.teamId || "plaz4hUowA4K2E2Pz5dc",
-      botId: siteConfig.docsbot?.botId || "5lhu0alGb4Ggy58RadtH",
-      apiKey: siteConfig.docsbot?.apiKey || "e5326dd3d34acebb28e95ec83ae742f17661fcf3935f43f1fe3e75ef5f63a884",
+      teamId: siteConfig.docsbot?.teamId || "",
+      botId: siteConfig.docsbot?.botId || "",
+      apiKey: siteConfig.docsbot?.apiKey || "",
       defaultLanguage: siteConfig.docsbot?.defaultLanguage || "en-US"
     },
     twilio: {
@@ -291,13 +291,6 @@
           font-family: 'Arial', sans-serif;
           position: fixed;
           z-index: 9999;
-        }
-
-        /* Thinking message style */
-        .law-chat-thinking-message .law-chat-bubble-content {
-          background-color: #f0f4f8;
-          color: #4a5568;
-          font-style: italic;
         }
         
         /* Chat Bubble - Enhanced with glowing effect and text */
@@ -764,7 +757,7 @@
         .law-chat-phone-submit:active:not(:disabled) {
           transform: translateY(0);
         }
-
+        
         .law-chat-phone-submit:disabled {
           background-color: #cbd5e0;
           cursor: not-allowed;
@@ -1160,6 +1153,62 @@
   
   // Messages Module - handles message creation, display, and user interactions
   const Messages = {
+
+// Add this method to the Messages module
+addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
+  UI.hideTypingIndicator();
+  
+  // Create message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+  
+  // Add custom heading
+  const heading = document.createElement('h4');
+  heading.textContent = headingText || 'Our attorneys wrote these resources for you:';
+  recommendationsDiv.appendChild(heading);
+  
+  // Create list for recommendations
+  const linkList = document.createElement('ul');
+  linkList.className = 'law-chat-recommendation-list';
+  
+  // Add each recommendation
+  recommendations.forEach(rec => {
+    let cleanTitle = rec.title || 'Resource';
+    if (cleanTitle.includes('|')) {
+      cleanTitle = cleanTitle.split('|')[0].trim();
+    }
+    
+    const listItem = document.createElement('li');
+    
+    const link = document.createElement('a');
+    link.className = 'law-chat-recommendation-link';
+    link.href = rec.url || '#';
+    link.textContent = cleanTitle;
+    link.target = '_blank';
+    
+    listItem.appendChild(link);
+    linkList.appendChild(listItem);
+  });
+  
+  recommendationsDiv.appendChild(linkList);
+  messageElement.appendChild(recommendationsDiv);
+  
+  // Add timestamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = UI.formatTime();
+  messageElement.appendChild(timeStamp);
+  
+  // Add to chat
+  DOM.elements.messages.appendChild(messageElement);
+  DOM.scrollToBottom();
+},
+
+
       // Add this method to the Messages module to handle sources from DocsBots
       addMessageWithSources(content, sources) {
         UI.hideTypingIndicator();
@@ -1227,109 +1276,95 @@
         });
       },
     // Add a message to the chat
-    // Add these methods to the Messages module
-addMessage(content, isUser, options = null, isThinking = false) {
-  // For user messages, add immediately
-  if (isUser) {
-    const messageClass = 'law-chat-message-user';
-    const messageTime = UI.formatTime();
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = `law-chat-message ${messageClass}`;
-    
-    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
-    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
-    messageElement.innerHTML = messageContent;
-    
-    DOM.elements.messages.appendChild(messageElement);
-    DOM.scrollToBottom();
-    
-    // Update chat history
-    ChatFlow.history.push({
-      role: "user",
-      content: content
-    });
-    return;
-  }
-  
-  // If this is a thinking message, add a special class
-  if (isThinking) {
-    const messageClass = 'law-chat-message-bot law-chat-thinking-message';
-    const messageTime = UI.formatTime();
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = `law-chat-message ${messageClass}`;
-    
-    let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
-    messageContent += `<div class="law-chat-time">${messageTime}</div>`;
-    messageElement.innerHTML = messageContent;
-    
-    DOM.elements.messages.appendChild(messageElement);
-    DOM.scrollToBottom();
-    return;
-  }
-  
-  // For bot messages, show typing and delay (keep the existing code for non-API responses)
-  UI.showTypingIndicator();
-  
-  // Create timer for delay
-  setTimeout(() => {
-    UI.hideTypingIndicator();
-    
-    const messageClass = 'law-chat-message-bot';
-    const messageTime = UI.formatTime();
-    
-    const messageElement = document.createElement('div');
-    messageElement.className = `law-chat-message ${messageClass}`;
-    
-    let messageHTML = `<div class="law-chat-bubble-content">${content}</div>`;
-    
-    // Add options if provided
-    if (options) {
-      messageHTML += `
-        <div class="law-chat-options">
-          ${options.map(option => 
-            `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`
-          ).join('')}
-        </div>
-      `;
-    }
-    
-    messageHTML += `<div class="law-chat-time">${messageTime}</div>`;
-    messageElement.innerHTML = messageHTML;
-    
-    DOM.elements.messages.appendChild(messageElement);
-    DOM.scrollToBottom();
-    
-    // Add click event listeners to options
-    if (options) {
-      const optionElements = messageElement.querySelectorAll('.law-chat-option');
-      optionElements.forEach(optionElement => {
-        optionElement.addEventListener('click', function() {
-          const selectedValue = this.getAttribute('data-value');
-          const selectedText = this.textContent;
-          ChatFlow.handleOptionSelection(selectedValue, selectedText);
+    addMessage(content, isUser, options = null) {
+      // For user messages, add immediately
+      if (isUser) {
+        const messageClass = 'law-chat-message-user';
+        const messageTime = UI.formatTime();
+        
+        const messageElement = document.createElement('div');
+        messageElement.className = `law-chat-message ${messageClass}`;
+        
+        let messageContent = `<div class="law-chat-bubble-content">${content}</div>`;
+        messageContent += `<div class="law-chat-time">${messageTime}</div>`;
+        messageElement.innerHTML = messageContent;
+        
+        DOM.elements.messages.appendChild(messageElement);
+        DOM.scrollToBottom();
+        
+        // Update chat history
+        ChatFlow.history.push({
+          role: "user",
+          content: content
         });
-      });
-    }
-    
-    // Update chat history for non-option messages
-    if (!options) {
-      ChatFlow.history.push({
-        role: "assistant",
-        content: content
-      });
-    }
-  }, 0); // No delay - immediate response
-},
+        return;
+      }
+      
+      // For bot messages, show typing and delay (keep the existing code for non-API responses)
+      UI.showTypingIndicator();
+      
+      // Calculate appropriate delay - Note: We're keeping this for non-API messages
+      const delay = options ? 
+        UI.getRandomDelay() : 
+        UI.calculateTypingDelay(content, 2000, 5000, UI.apiLatency);
+      
+      // Create timer for delay
+      setTimeout(() => {
+        UI.hideTypingIndicator();
+        
+        const messageClass = 'law-chat-message-bot';
+        const messageTime = UI.formatTime();
+        
+        const messageElement = document.createElement('div');
+        messageElement.className = `law-chat-message ${messageClass}`;
+        
+        let messageHTML = `<div class="law-chat-bubble-content">${content}</div>`;
+        
+        // Add options if provided
+        if (options) {
+          messageHTML += `
+            <div class="law-chat-options">
+              ${options.map(option => 
+                `<div class="law-chat-option" data-value="${option.value}">${option.text}</div>`
+              ).join('')}
+            </div>
+          `;
+        }
+        
+        messageHTML += `<div class="law-chat-time">${messageTime}</div>`;
+        messageElement.innerHTML = messageHTML;
+        
+        DOM.elements.messages.appendChild(messageElement);
+        DOM.scrollToBottom();
+        
+        // Add click event listeners to options
+        if (options) {
+          const optionElements = messageElement.querySelectorAll('.law-chat-option');
+          optionElements.forEach(optionElement => {
+            optionElement.addEventListener('click', function() {
+              const selectedValue = this.getAttribute('data-value');
+              const selectedText = this.textContent;
+              ChatFlow.handleOptionSelection(selectedValue, selectedText);
+            });
+          });
+        }
+        
+        // Update chat history for non-option messages
+        if (!options) {
+          ChatFlow.history.push({
+            role: "assistant",
+            content: content
+          });
+        }
+      }, delay);
 
-// Add method to remove thinking message
-removeThinkingMessage() {
-  const thinkingMessage = document.querySelector('.law-chat-thinking-message');
-  if (thinkingMessage && thinkingMessage.parentNode) {
-    thinkingMessage.parentNode.removeChild(thinkingMessage);
-  }
-},
+      if (!isUser && !options) {
+        // Use a longer timeout to ensure all DOM updates and animations are complete
+        setTimeout(() => {
+          this.disableCompletedOptions();
+        }, 500);
+      }
+    },
     
     // Add recommendations with content
     addMessageWithRecommendations(content, recommendations) {
@@ -1407,60 +1442,59 @@ removeThinkingMessage() {
     },
     
     // Add only recommendations without content
-    addOnlyRecommendations(recommendations) {
-      UI.hideTypingIndicator();
-      
-      // Create message element
-      const messageElement = document.createElement('div');
-      messageElement.className = 'law-chat-message law-chat-message-bot';
-      
-      // Create recommendations container
-      const recommendationsDiv = document.createElement('div');
-      recommendationsDiv.className = 'law-chat-recommendations';
-      
-      // Add heading
-      const heading = document.createElement('h4');
-      heading.textContent = 'Our attorneys wrote these resources for you:';
-      recommendationsDiv.appendChild(heading);
-      
-      // Create list for recommendations
-      const linkList = document.createElement('ul');
-      linkList.className = 'law-chat-recommendation-list';
-      
-      // Add each recommendation
-      recommendations.forEach(rec => {
-        let cleanTitle = rec.title || 'Resource';
-        if (cleanTitle.includes('|')) {
-          cleanTitle = cleanTitle.split('|')[0].trim();
-        }
-        
-        const listItem = document.createElement('li');
-        
-        const link = document.createElement('a');
-        link.className = 'law-chat-recommendation-link';
-        link.href = rec.url || '#';
-        link.textContent = cleanTitle;
-        link.target = '_blank';
-        
-        listItem.appendChild(link);
-        linkList.appendChild(listItem);
-      });
-      
-      recommendationsDiv.appendChild(linkList);
-      messageElement.appendChild(recommendationsDiv);
-      
-      // Add timestamp
-      const timeStamp = document.createElement('div');
-      timeStamp.className = 'law-chat-time';
-      timeStamp.textContent = UI.formatTime();
-      messageElement.appendChild(timeStamp);
-      
-      // Add to chat
-      DOM.elements.messages.appendChild(messageElement);
-      DOM.scrollToBottom();
-      
-      // No need to update chat history for recommendations-only
-    },
+    // Make sure the Messages.addOnlyRecommendations method looks like this:
+addOnlyRecommendations(recommendations) {
+  UI.hideTypingIndicator();
+  
+  // Create message element
+  const messageElement = document.createElement('div');
+  messageElement.className = 'law-chat-message law-chat-message-bot';
+  
+  // Create recommendations container
+  const recommendationsDiv = document.createElement('div');
+  recommendationsDiv.className = 'law-chat-recommendations';
+  
+  // Add heading
+  const heading = document.createElement('h4');
+  heading.textContent = 'Our attorneys wrote these resources for you:';
+  recommendationsDiv.appendChild(heading);
+  
+  // Create list for recommendations
+  const linkList = document.createElement('ul');
+  linkList.className = 'law-chat-recommendation-list';
+  
+  // Add each recommendation
+  recommendations.forEach(rec => {
+    let cleanTitle = rec.title || 'Resource';
+    if (cleanTitle.includes('|')) {
+      cleanTitle = cleanTitle.split('|')[0].trim();
+    }
+    
+    const listItem = document.createElement('li');
+    
+    const link = document.createElement('a');
+    link.className = 'law-chat-recommendation-link';
+    link.href = rec.url || '#';
+    link.textContent = cleanTitle;
+    link.target = '_blank';
+    
+    listItem.appendChild(link);
+    linkList.appendChild(listItem);
+  });
+  
+  recommendationsDiv.appendChild(linkList);
+  messageElement.appendChild(recommendationsDiv);
+  
+  // Add timestamp
+  const timeStamp = document.createElement('div');
+  timeStamp.className = 'law-chat-time';
+  timeStamp.textContent = UI.formatTime();
+  messageElement.appendChild(timeStamp);
+  
+  // Add to chat
+  DOM.elements.messages.appendChild(messageElement);
+  DOM.scrollToBottom();
+},
 
     // Add to Messages module
     addDisclaimerMessage() {
@@ -1850,10 +1884,8 @@ removeThinkingMessage() {
       }
     },
     
-    // Process user's direct text input
-// Update this method in the ChatFlow module
-// Update this method in the ChatFlow module
-// Update the ChatFlow.handleUserMessage method
+
+// ChatFlow.handleUserMessage modification
 handleUserMessage(message) {
   console.log("Handling user message:", message, "Stage:", this.stage);
   
@@ -1866,15 +1898,15 @@ handleUserMessage(message) {
     
     // Check if this is the first message after qualification (case description)
     if (!this.caseDetailsProvided) {
-      console.log("First case details - sending to DocsBots with resources option");
+      console.log("First case details - sending directly to DocsBots API");
       this.caseDetailsProvided = true;
       
-      // Call DocsBots API for the first case description with showResources flag
-      API.sendMessageToDocsBot(message, true);
+      // Send directly to DocsBots API instead of showing static recommendations
+      API.sendMessageToDocsBot(message);
     } else {
       console.log("Regular conversation - sending to DocsBots");
-      // For all subsequent messages, use the API without resources
-      API.sendMessageToDocsBot(message, false);
+      // For all subsequent messages, use the API
+      API.sendMessageToDocsBot(message);
     }
   } else if (this.stage === 'initial') {
     // User hasn't selected case type yet
@@ -2034,6 +2066,8 @@ handleUserMessage(message) {
   // API Module - handles all API calls to external services
 // Replace the previous API implementation with these methods
 const API = {
+  shownSourceUrls: new Set(),
+  firstRecommendationShown: false,
   // Method to get resources for the first case description
   async getResourcesForCase(message) {
   UI.showTypingIndicator();
@@ -2157,17 +2191,9 @@ const API = {
   
   // Method to handle normal conversation with DocsBots
 // Completely replace the API.sendMessageToDocsBot method with this basic implementation
-// Update the API.sendMessageToDocsBot method
-async sendMessageToDocsBot(message, showResources = false) {
-  console.log("Sending message to DocsBots:", message, "showResources:", showResources);
-  
-  // Show typing indicator or thinking message
-  if (message.length > 100) {
-    // For longer messages, show "Thinking..." to indicate processing
-    Messages.addMessage("Thinking...", false, null, true); // Added parameter for "thinking" state
-  } else {
-    UI.showTypingIndicator();
-  }
+async sendMessageToDocsBot(message) {
+  console.log("Sending message to DocsBots:", message);
+  UI.showTypingIndicator();
   
   try {
     // Generate a conversationId if not exists
@@ -2176,19 +2202,41 @@ async sendMessageToDocsBot(message, showResources = false) {
       console.log("Generated new conversation ID:", ChatFlow.conversationId);
     }
     
-    // Basic DocsBots API Request - no streaming
+    // Check if this is the first message after qualification
+    const isFirstMessage = ChatFlow.caseDetailsProvided && 
+                         (!ChatFlow.history.some(item => item.role === "assistant" && 
+                                               item.content !== "Thank you. Could you tell me a little bit about your case?"));
+    
+    // Prepare conversation history for the API in the format it expects
+    // Most LLM APIs expect a messages array with role and content
+    const conversationHistory = ChatFlow.history.map(item => ({
+      role: item.role,
+      content: item.content
+    }));
+    
+    // Enhance metadata for better context
+    const enhancedMetadata = { 
+      name: ChatFlow.userName || "Visitor",
+      caseType: ChatFlow.userCaseType || "",
+      location: ChatFlow.userLocation || "",
+      isFirstContact: isFirstMessage
+    };
+    
+    console.log("Is first detailed message:", isFirstMessage);
+    console.log("Sending conversation history of length:", conversationHistory.length);
+    
+    // DocsBots API Request
     const requestBody = {
       conversationId: ChatFlow.conversationId,
       question: message,
-      metadata: { 
-        name: ChatFlow.userName || "Visitor",
-        caseType: ChatFlow.userCaseType || "",
-        location: ChatFlow.userLocation || ""
-      },
+      conversation_history: conversationHistory,  // Add full conversation history
+      metadata: enhancedMetadata,
+      context_items: isFirstMessage ? 5 : 3, // Retrieve more context for first message
+      human_escalation: false,
+      followup_rating: false,
       document_retriever: true,
-      context_items: 10, // More context items for better answers
-      full_source: showResources, // Get full source content if showing resources
-      stream: false // No streaming
+      full_source: true,
+      stream: false
     };
     
     console.log("DocsBots request payload:", requestBody);
@@ -2224,54 +2272,54 @@ async sendMessageToDocsBot(message, showResources = false) {
     
     console.log("DocsBots parsed response:", responseData);
     
-    // Hide typing indicator or remove thinking message
-    if (message.length > 100) {
-      Messages.removeThinkingMessage();
-    } else {
-      UI.hideTypingIndicator();
-    }
+    UI.hideTypingIndicator();
     
     // Extract answer and sources from response
-    let answer = null;
-    let sources = [];
-    
-    // Try multiple approaches to find the answer and sources in the response
-    if (Array.isArray(responseData)) {
-      console.log("Processing array response");
-      // Find the first lookup_answer event
-      for (const event of responseData) {
-        console.log("Processing event:", event);
-        if (event && event.event === 'lookup_answer' && event.data) {
-          if (event.data.answer) {
-            answer = event.data.answer;
-            console.log("Found answer in lookup_answer event:", answer);
-          }
-          if (event.data.sources) {
-            sources = event.data.sources;
-            console.log("Found sources in lookup_answer event:", sources);
-          }
-          break;
-        }
+let answer = null;
+let sources = [];
+
+// Try multiple approaches to find the answer and sources in the response
+if (Array.isArray(responseData)) {
+  console.log("Processing array response");
+  // Find the lookup_answer event
+  for (const event of responseData) {
+    console.log("Processing event:", event);
+    if (event && event.event === 'lookup_answer' && event.data) {
+      if (event.data.answer) {
+        answer = event.data.answer;
+        console.log("Found answer in lookup_answer event:", answer);
       }
-    } else if (responseData && typeof responseData === 'object') {
-      console.log("Processing object response");
-      // Look for answer in various places
-      if (responseData.data && responseData.data.answer) {
-        answer = responseData.data.answer;
-        console.log("Found answer in responseData.data.answer:", answer);
-        if (responseData.data.sources) {
-          sources = responseData.data.sources;
-          console.log("Found sources in responseData.data.sources:", sources);
-        }
-      } else if (responseData.answer) {
-        answer = responseData.answer;
-        console.log("Found answer in responseData.answer:", answer);
-        if (responseData.sources) {
-          sources = responseData.sources;
-          console.log("Found sources in responseData.sources:", sources);
-        }
+      
+      // Extract sources from the response
+      if (event.data.sources && Array.isArray(event.data.sources)) {
+        sources = event.data.sources;
+        console.log("Found sources in lookup_answer event:", sources);
       }
     }
+  }
+} else if (responseData && typeof responseData === 'object') {
+  console.log("Processing object response");
+  // Look for answer in various places
+  if (responseData.data && responseData.data.answer) {
+    answer = responseData.data.answer;
+    console.log("Found answer in responseData.data.answer:", answer);
+    
+    // Also check for sources here
+    if (responseData.data.sources && Array.isArray(responseData.data.sources)) {
+      sources = responseData.data.sources;
+      console.log("Found sources in responseData.data.sources:", sources);
+    }
+  } else if (responseData.answer) {
+    answer = responseData.answer;
+    console.log("Found answer in responseData.answer:", answer);
+    
+    // Also check for sources here
+    if (responseData.sources && Array.isArray(responseData.sources)) {
+      sources = responseData.sources;
+      console.log("Found sources in responseData.sources:", sources);
+    }
+  }
+}
     
     // If no answer found, use generic fallback
     if (!answer) {
@@ -2280,44 +2328,85 @@ async sendMessageToDocsBot(message, showResources = false) {
     }
     
     console.log("Final answer to display:", answer);
-    
-    // Convert sources to recommendations format if needed
-    let recommendations = [];
-    if (showResources && sources && sources.length > 0) {
-      recommendations = sources.slice(0, 3).map(source => ({
-        title: source.title || "Resource",
-        url: source.url || "#",
-        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
-        category: ChatFlow.userCaseType || "Legal"
-      }));
-      console.log("Converted sources to recommendations:", recommendations);
-    }
-    
-    // If we are showing resources and have recommendations, display them with the answer
-    if (showResources && recommendations.length > 0) {
-      console.log("Showing recommendations with answer");
-      // Show resources first
-      Messages.addOnlyRecommendations(recommendations);
+console.log("Sources found:", sources ? sources.length : 0);
+
+// Process and deduplicate sources
+let uniqueSources = [];
+let allSourcesAlreadyShown = true; // Flag to track if all sources have been shown before
+
+if (sources && sources.length > 0) {
+  // Create a map to track seen URLs to help with deduplication for this response
+  const seenUrls = new Map();
+  
+  // Process each source
+  sources.forEach(source => {
+    const url = source.url || "";
+    // Skip if we've seen this URL before in this response or if it's empty
+    if (!seenUrls.has(url) && url && url.trim() !== "") {
+      seenUrls.set(url, true);
       
-      // Then show the answer
-      Messages.addMessage(answer, false);
-    } else {
-      // Just show the answer
-      console.log("Showing only answer");
-      Messages.addMessage(answer, false);
+      // Check if this source has been shown to the user before
+      const isNewSource = !API.shownSourceUrls.has(url);
+      if (isNewSource) {
+        allSourcesAlreadyShown = false; // At least one new source
+      }
+      
+      uniqueSources.push({
+        title: source.title || "Resource",
+        url: url,
+        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
+        category: ChatFlow.userCaseType || "Legal",
+        isNew: isNewSource
+      });
     }
-    
-    // Update conversation history
-    ChatFlow.history.push({ role: "user", content: message });
-    ChatFlow.history.push({ role: "assistant", content: answer });
+  });
+  
+  // Filter to only include new sources if there are any
+  const newSources = uniqueSources.filter(source => source.isNew);
+  
+  // If we have new sources, use those, otherwise keep all (up to 2)
+  uniqueSources = newSources.length > 0 ? newSources : uniqueSources;
+  
+  // Limit to top 2 unique sources
+  uniqueSources = uniqueSources.slice(0, 2);
+  
+  // Mark these sources as shown for future reference
+  uniqueSources.forEach(source => {
+    API.shownSourceUrls.add(source.url);
+  });
+  
+  console.log("Unique sources to display:", uniqueSources);
+}
+
+// First add the answer to the chat
+Messages.addMessage(answer, false);
+
+// If we have unique sources and at least one is new, display them in the resources bubble
+if (uniqueSources && uniqueSources.length > 0 && !allSourcesAlreadyShown) {
+  console.log("Adding recommendations bubble with sources:", uniqueSources);
+  
+  // Determine the appropriate heading based on whether this is the first recommendation
+  let headingText;
+  if (!API.firstRecommendationShown) {
+    headingText = "Our attorneys wrote these resources for you:";
+    API.firstRecommendationShown = true; // Mark that we've shown the first recommendation
+  } else {
+    headingText = "Based on the conversation, this resource may be tailored to you too:";
+  }
+  
+  setTimeout(() => {
+    // Use the custom heading method with the appropriate heading
+    Messages.addOnlyRecommendationsWithCustomHeading(uniqueSources, headingText);
+  }, 100); // Small delay to ensure the message is processed first
+}
+
+// Update conversation history
+ChatFlow.history.push({ role: "user", content: message });
+ChatFlow.history.push({ role: "assistant", content: answer });
     
   } catch (error) {
     console.error("Error in sendMessageToDocsBot:", error);
-    if (message.length > 100) {
-      Messages.removeThinkingMessage();
-    } else {
-      UI.hideTypingIndicator();
-    }
+    UI.hideTypingIndicator();
     
     // Simple fallback
     const fallback = "I apologize, but I'm having trouble connecting to our knowledge base at the moment. For immediate assistance, please call our office at (913) 451-9500.";
