@@ -1642,7 +1642,7 @@ addOnlyRecommendations(recommendations) {
 
     // Add to Messages module
     addDisclaimerMessage() {
-      const message = "Utilizing this chat service does not create an attorney-client relationship. Any information communicated in this chat is not legal advice. Some of the responses may utilize AI based on the content of our website. Do you agree?";
+      const message = "Utilizing this chat service does not create an attorney-client relationship. Because there is not an attorney-client relationship, the chat service is not confidential or privileged. Any information communicated in this chat is not legal advice. Some of the responses may utilize AI based on the content of our website. Do you agree?";
       
       Messages.addMessage(message, false, [
         { value: 'agree', text: 'I Agree' },
