@@ -1,6 +1,6 @@
 /**
  * Roth Davies Law Firm Chatbot
- * A modular, performance-optimized implementation
+ * A modular, performance-optimized implementation with server-side API integration
  */
 (function() {
   // Configuration module - centralized settings
@@ -9,29 +9,20 @@
   const siteConfig = window.LawChatbotConfig || {};
 
   const Config = {
-    // API keys - merged with defaults
-    docsbot: {
-      teamId: siteConfig.docsbot?.teamId || "",
-      botId: siteConfig.docsbot?.botId || "",
-      apiKey: siteConfig.docsbot?.apiKey || "",
-      defaultLanguage: siteConfig.docsbot?.defaultLanguage || "en-US"
-    },
-    twilio: {
-    accountSid: siteConfig.twilio?.accountSid || "",
-    authToken: siteConfig.twilio?.authToken || "", 
-    fromNumber: siteConfig.twilio?.fromNumber || "+19133956075",
-    toNumber: siteConfig.twilio?.toNumber || "+19134753876"
-    },
+    // Server configuration
+    serverUrl: siteConfig.serverUrl || 'https://your-render-app.onrender.com', // Replace with your Render URL
+    
     videos: {
-    default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
-    'personal-injury': siteConfig.videos?.['personal-injury'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/personal-injury.mp4',
-    'criminal-defense': siteConfig.videos?.['criminal-defense'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/criminal-defense.mp4',
-    'divorce': siteConfig.videos?.['divorce'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/family-law.mp4'
+      default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
+      'personal-injury': siteConfig.videos?.['personal-injury'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/personal-injury.mp4',
+      'criminal-defense': siteConfig.videos?.['criminal-defense'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/criminal-defense.mp4',
+      'divorce': siteConfig.videos?.['divorce'] || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/family-law.mp4'
     },
     timing: {
-    minTypingDelay: siteConfig.timing?.minTypingDelay || 1500,
-    maxTypingDelay: siteConfig.timing?.maxTypingDelay || 2500,
-    notificationDelay: siteConfig.timing?.notificationDelay || 2000
+      minTypingDelay: siteConfig.timing?.minTypingDelay || 1500,
+      maxTypingDelay: siteConfig.timing?.maxTypingDelay || 2500,
+      notificationDelay: siteConfig.timing?.notificationDelay || 2000,
+      warmingInterval: 240000 // 4 minutes in milliseconds
     },
     cssSelector: {
       container: '.law-chat-widget',
@@ -46,7 +37,75 @@
     }
   };
 
-  // DOM Module - handles all DOM-related operations
+  // Server warming and keep-alive functionality
+  const ServerWarming = {
+    isWarmed: false,
+    warmingInterval: null,
+    chatWindowOpen: false,
+    
+    async warmServer() {
+      if (this.isWarmed) return;
+      
+      try {
+        console.log('Warming server...');
+        const response = await fetch(`${Config.serverUrl}/warm`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({}),
+        });
+        
+        if (response.ok) {
+          this.isWarmed = true;
+          console.log('Server warmed successfully');
+          this.startKeepAlive();
+        } else {
+          console.warn('Server warming failed:', response.status);
+        }
+      } catch (error) {
+        console.warn('Server warming error:', error);
+      }
+    },
+    
+    startKeepAlive() {
+      if (this.warmingInterval) return;
+      
+      this.warmingInterval = setInterval(async () => {
+        if (this.chatWindowOpen) {
+          try {
+            await fetch(`${Config.serverUrl}/warm`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({}),
+            });
+            console.log('Keep-alive ping sent');
+          } catch (error) {
+            console.warn('Keep-alive ping failed:', error);
+          }
+        }
+      }, Config.timing.warmingInterval);
+    },
+    
+    stopKeepAlive() {
+      if (this.warmingInterval) {
+        clearInterval(this.warmingInterval);
+        this.warmingInterval = null;
+      }
+      this.chatWindowOpen = false;
+    },
+    
+    setChatWindowOpen(isOpen) {
+      this.chatWindowOpen = isOpen;
+      if (!isOpen) {
+        this.stopKeepAlive();
+      }
+    }
+  };
+
+  // DOM Module - handles all DOM-related operations (keeping existing implementation)
   const DOM = {
     elements: {},
     
@@ -154,67 +213,67 @@
     },
     
     cacheElements() {
-  // Save references to frequently accessed elements for better performance
-  const selectors = Config.cssSelector;
-  this.elements = {
-    container: document.querySelector(selectors.container),
-    messages: document.querySelector(selectors.messages),
-    input: document.querySelector(selectors.input),
-    send: document.querySelector(selectors.send),
-    bubble: document.querySelector(selectors.bubble),
-    window: document.querySelector(selectors.window),
-    close: document.querySelector(selectors.close),
-    typing: document.querySelector(selectors.typing),
-    notification: document.querySelector(selectors.notification)
-  };
-  
-this.elements.input.addEventListener('input', () => {
-  // Store current text
-  const text = this.elements.input.value;
-  
-  // For empty text, reset to single line height
-  if (!text) {
-    this.elements.input.style.height = '24px';
-    return;
-  }
-  
-  // Save the original height
-  const originalHeight = this.elements.input.style.height || '24px';
-  
-  // Reset to measure how much space is actually needed
-  this.elements.input.style.height = '24px';
-  
-  // Check if content overflows the single line
-  const hasOverflow = this.elements.input.scrollHeight > this.elements.input.clientHeight;
-  
-  if (hasOverflow) {
-    // Text doesn't fit in one line
-    
-    // Count actual newlines
-    const newlineCount = (text.match(/\n/g) || []).length;
-    
-    // Calculate height based on newlines (plus 1 for the first line)
-    const lineHeight = 24;
-    const neededRows = newlineCount + 1;
-    const calculatedHeight = Math.min(120, neededRows * lineHeight);
-    
-    // Set exact height for needed lines
-    this.elements.input.style.height = `${calculatedHeight}px`;
-    
-    // Check again for overflow after setting to calculated height
-    // This handles the case where a line is longer than the width
-    if (this.elements.input.scrollHeight > this.elements.input.clientHeight) {
-      this.elements.input.style.height = `${Math.min(120, this.elements.input.scrollHeight)}px`;
-    }
-  } else {
-    // Content fits in one line, keep it at one line
-    this.elements.input.style.height = '24px';
-  }
-  
-  // Scroll chat to bottom
-  this.scrollToBottom();
-});
-},
+      // Save references to frequently accessed elements for better performance
+      const selectors = Config.cssSelector;
+      this.elements = {
+        container: document.querySelector(selectors.container),
+        messages: document.querySelector(selectors.messages),
+        input: document.querySelector(selectors.input),
+        send: document.querySelector(selectors.send),
+        bubble: document.querySelector(selectors.bubble),
+        window: document.querySelector(selectors.window),
+        close: document.querySelector(selectors.close),
+        typing: document.querySelector(selectors.typing),
+        notification: document.querySelector(selectors.notification)
+      };
+      
+      this.elements.input.addEventListener('input', () => {
+        // Store current text
+        const text = this.elements.input.value;
+        
+        // For empty text, reset to single line height
+        if (!text) {
+          this.elements.input.style.height = '24px';
+          return;
+        }
+        
+        // Save the original height
+        const originalHeight = this.elements.input.style.height || '24px';
+        
+        // Reset to measure how much space is actually needed
+        this.elements.input.style.height = '24px';
+        
+        // Check if content overflows the single line
+        const hasOverflow = this.elements.input.scrollHeight > this.elements.input.clientHeight;
+        
+        if (hasOverflow) {
+          // Text doesn't fit in one line
+          
+          // Count actual newlines
+          const newlineCount = (text.match(/\n/g) || []).length;
+          
+          // Calculate height based on newlines (plus 1 for the first line)
+          const lineHeight = 24;
+          const neededRows = newlineCount + 1;
+          const calculatedHeight = Math.min(120, neededRows * lineHeight);
+          
+          // Set exact height for needed lines
+          this.elements.input.style.height = `${calculatedHeight}px`;
+          
+          // Check again for overflow after setting to calculated height
+          // This handles the case where a line is longer than the width
+          if (this.elements.input.scrollHeight > this.elements.input.clientHeight) {
+            this.elements.input.style.height = `${Math.min(120, this.elements.input.scrollHeight)}px`;
+          }
+        } else {
+          // Content fits in one line, keep it at one line
+          this.elements.input.style.height = '24px';
+        }
+        
+        // Scroll chat to bottom
+        this.scrollToBottom();
+      });
+    },
     
     setupEventListeners() {
       // Chat toggle event listeners
@@ -295,7 +354,7 @@ this.elements.input.addEventListener('input', () => {
     },
     
     getChatbotStyles() {
-      // Return CSS styles for chatbot
+      // Return CSS styles for chatbot (keeping the exact same styles as before)
       return `
         /* Chatbot Container Styles */
         .law-chat-widget {
@@ -528,24 +587,24 @@ this.elements.input.addEventListener('input', () => {
           padding: 8px 12px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           margin-bottom: 8px;
-          box-sizing: border-box; /* Ensure padding is included in width */
-          max-width: 100%; /* Ensure container doesn't exceed its parent */
-          flex-wrap: nowrap; /* Prevent wrapping */
+          box-sizing: border-box;
+          max-width: 100%;
+          flex-wrap: nowrap;
         }
 
         .law-chat-name-input {
           flex: 1;
-          min-width: 0; /* Allow input to shrink below default min-width */
+          min-width: 0;
           border: none;
           background: transparent;
           font-size: 16px;
           padding: 8px;
-          margin-right: 10px; /* Add space between input and button */
+          margin-right: 10px;
           outline: none;
           color: #1a365d;
-          box-sizing: border-box; /* Ensure padding is included */
-          overflow: hidden; /* Prevent overflow */
-          text-overflow: ellipsis; /* Add ellipsis for text overflow */
+          box-sizing: border-box;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .law-chat-name-input:focus {
@@ -559,16 +618,16 @@ this.elements.input.addEventListener('input', () => {
           border: none;
           border-radius: 8px;
           padding: 6px 12px;
-          font-size: 14px; /* Slightly reduce font size */
+          font-size: 14px;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-          flex-shrink: 0; /* Prevent button from shrinking */
-          align-self: center; /* Center vertically */
-          white-space: nowrap; /* Prevent text wrapping */
-          max-width: 80px; /* Limit button width */
-          overflow: hidden; /* Prevent overflow */
-          text-overflow: ellipsis; /* Add ellipsis for text overflow */
+          flex-shrink: 0;
+          align-self: center;
+          white-space: nowrap;
+          max-width: 80px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .law-chat-name-submit:hover:not(:disabled) {
@@ -647,12 +706,12 @@ this.elements.input.addEventListener('input', () => {
           border-radius: 20px;
           padding: 8px 16px;
           font-size: 14px;
-          font-weight: 500; /* Make all options same weight from the start */
+          font-weight: 500;
           color: #1a365d;
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-          box-sizing: border-box; /* Ensures padding is included in width calculations */
+          box-sizing: border-box;
         }
 
         .law-chat-option:hover {
@@ -668,12 +727,10 @@ this.elements.input.addEventListener('input', () => {
         }
 
         .law-chat-option.selected {
-          background-color: #1a365d; /* Use background color change instead of bold */
-          color: white; /* White text for better contrast */
+          background-color: #1a365d;
+          color: white;
           border-color: #1a365d;
-          /* Remove font-weight change to prevent size changes */
           box-shadow: none;
-          /* No transform to prevent layout shifts */
           transform: none;
         }
 
@@ -682,9 +739,8 @@ this.elements.input.addEventListener('input', () => {
           color: #4a5568;
           border-color: #cbd5e0;
           cursor: default;
-          pointer-events: none; /* Disable interactions */
+          pointer-events: none;
           box-shadow: none;
-          /* No transform to prevent layout shifts */
           transform: none;
         }
         
@@ -699,7 +755,7 @@ this.elements.input.addEventListener('input', () => {
         /* Typing Indicator */
         .law-chat-typing {
           display: none;
-          margin: 10px 0 14px 20px; /* Added left margin to align with other messages */
+          margin: 10px 0 14px 20px;
         }
         
         .law-chat-typing-dots {
@@ -829,12 +885,12 @@ this.elements.input.addEventListener('input', () => {
           transition: border-color 0.2s, box-shadow 0.2s;
           resize: none;
           overflow: hidden;
-          height: 24px; /* Exact height for a single line of text */
+          height: 24px;
           max-height: 120px;
-          line-height: 24px; /* Match height for single line text */
-          white-space: pre-wrap; /* Preserve whitespace but allow wrapping */
-          word-break: break-word; /* Break long words if needed */
-          box-sizing: content-box; /* Make sure padding doesn't affect height calculation */
+          line-height: 24px;
+          white-space: pre-wrap;
+          word-break: break-word;
+          box-sizing: content-box;
         }
         
         .law-chat-input:focus {
@@ -882,7 +938,7 @@ this.elements.input.addEventListener('input', () => {
 
         /* Enhanced send button for when recommendations might be available */
         .law-chat-send-with-recommendations {
-          background-color: #0f4c81; /* Slightly different color */
+          background-color: #0f4c81;
           box-shadow: 0 2px 8px rgba(26, 54, 93, 0.4);
         }
 
@@ -1021,6 +1077,9 @@ this.elements.input.addEventListener('input', () => {
       
       this.hideNotification();
       
+      // Set chat window as open for server warming
+      ServerWarming.setChatWindowOpen(true);
+      
       // Start qualification flow if it's the first time opening
       if (ChatFlow.history.length === 0) {
         if (!this.videoAdded) {
@@ -1036,6 +1095,9 @@ this.elements.input.addEventListener('input', () => {
     closeChat() {
       DOM.elements.window.style.display = 'none';
       DOM.elements.bubble.style.display = 'flex';
+      
+      // Set chat window as closed for server warming
+      ServerWarming.setChatWindowOpen(false);
       
       // Pause any playing videos
       const videos = DOM.elements.messages.querySelectorAll('video');
@@ -1194,214 +1256,29 @@ this.elements.input.addEventListener('input', () => {
   // Messages Module - handles message creation, display, and user interactions
   const Messages = {
 
-    // Add this method to the Messages module
-// Add this method to the Messages module
-// Updated typing effect method with fade-in
-// Updated typing effect method with slower speed and fixed duplication issue
-addMessageWithTypingEffect(content, isUser) {
-  // For user messages, add immediately without typing effect
-  if (isUser) {
-    this.addMessage(content, true);
-    return;
-  }
-  
-  UI.showTypingIndicator();
-  
-  // Create a short delay before starting the typing effect
-  setTimeout(() => {
-    UI.hideTypingIndicator();
-    
-    // Create the message element
-    const messageElement = document.createElement('div');
-    messageElement.className = 'law-chat-message law-chat-message-bot';
-    
-    // Create message content container
-    const messageContent = document.createElement('div');
-    messageContent.className = 'law-chat-bubble-content';
-    messageContent.innerHTML = ''; // Start empty
-    messageElement.appendChild(messageContent);
-    
-    // Add timestamp
-    const timeStamp = document.createElement('div');
-    timeStamp.className = 'law-chat-time';
-    timeStamp.textContent = UI.formatTime();
-    messageElement.appendChild(timeStamp);
-    
-    // Add to chat
-    DOM.elements.messages.appendChild(messageElement);
-    DOM.scrollToBottom();
-    
-    // Calculate a much slower typing speed
-    const totalChars = content.length;
-    const minDuration = 4000; // Minimum 4 seconds for very short messages
-    const maxDuration = 12000; // Maximum 12 seconds for very long messages
-    
-    // Scale duration based on content length
-    const targetDuration = Math.min(maxDuration, 
-      minDuration + (totalChars / 10) * 50); // Much slower scaling
-    
-    // Divide content into words for more natural typing
-    const words = content.split(/\s+/);
-    const totalWords = words.length;
-    
-    // Calculate time per word to achieve target duration
-    const timePerWord = targetDuration / totalWords;
-    
-    let displayedWords = 0;
-    
-    const typeNextWord = () => {
-      if (displayedWords >= totalWords) {
-        // Typing complete
-        // IMPORTANT: Only update the chat history here, don't add another message
-        ChatFlow.history.push({
-          role: "assistant",
-          content: content
-        });
+    // Add message with typing effect
+    addMessageWithTypingEffect(content, isUser) {
+      // For user messages, add immediately without typing effect
+      if (isUser) {
+        this.addMessage(content, true);
         return;
       }
       
-      // Create a container for the new word with fade-in effect
-      const wordSpan = document.createElement('span');
-      wordSpan.className = 'law-chat-typed-word';
+      UI.showTypingIndicator();
       
-      // Add proper spacing between words
-      if (displayedWords > 0) {
-        wordSpan.textContent = ' ' + words[displayedWords];
-      } else {
-        wordSpan.textContent = words[displayedWords];
-      }
-      
-      wordSpan.style.opacity = '0';
-      
-      // Append the word to the message
-      messageContent.appendChild(wordSpan);
-      
-      // Trigger the fade-in effect
+      // Create a short delay before starting the typing effect
       setTimeout(() => {
-        wordSpan.style.opacity = '1';
-      }, 10);
-      
-      // Move to next word
-      displayedWords++;
-      
-      // Schedule the next word with more variation for natural effect
-      // Base timing is slower, plus 20-100% random variation
-      const baseDelay = timePerWord;
-      const randomFactor = 0.2 + (Math.random() * 0.8); // 20-100% variation
-      setTimeout(typeNextWord, baseDelay * randomFactor);
-      
-      DOM.scrollToBottom();
-    };
-    
-    // Start the typing effect
-    setTimeout(typeNextWord, 200);
-  }, 300);
-},
-
-// Add this method to the Messages module
-addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
-  UI.hideTypingIndicator();
-  
-  // Create message element
-  const messageElement = document.createElement('div');
-  messageElement.className = 'law-chat-message law-chat-message-bot';
-  
-  // Create recommendations container
-  const recommendationsDiv = document.createElement('div');
-  recommendationsDiv.className = 'law-chat-recommendations';
-  
-  // Add custom heading
-  const heading = document.createElement('h4');
-  heading.textContent = headingText || 'Our attorneys wrote these resources for you:';
-  recommendationsDiv.appendChild(heading);
-  
-  // Create list for recommendations
-  const linkList = document.createElement('ul');
-  linkList.className = 'law-chat-recommendation-list';
-  
-  // Add each recommendation
-  recommendations.forEach(rec => {
-    let cleanTitle = rec.title || 'Resource';
-    if (cleanTitle.includes('|')) {
-      cleanTitle = cleanTitle.split('|')[0].trim();
-    }
-    
-    const listItem = document.createElement('li');
-    
-    const link = document.createElement('a');
-    link.className = 'law-chat-recommendation-link';
-    link.href = rec.url || '#';
-    link.textContent = cleanTitle;
-    link.target = '_blank';
-    
-    listItem.appendChild(link);
-    linkList.appendChild(listItem);
-  });
-  
-  recommendationsDiv.appendChild(linkList);
-  messageElement.appendChild(recommendationsDiv);
-  
-  // Add timestamp
-  const timeStamp = document.createElement('div');
-  timeStamp.className = 'law-chat-time';
-  timeStamp.textContent = UI.formatTime();
-  messageElement.appendChild(timeStamp);
-  
-  // Add to chat
-  DOM.elements.messages.appendChild(messageElement);
-  DOM.scrollToBottom();
-},
-
-
-      // Add this method to the Messages module to handle sources from DocsBots
-      addMessageWithSources(content, sources) {
         UI.hideTypingIndicator();
         
         // Create the message element
         const messageElement = document.createElement('div');
         messageElement.className = 'law-chat-message law-chat-message-bot';
         
-        // Add content
-        let messageContent = document.createElement('div');
+        // Create message content container
+        const messageContent = document.createElement('div');
         messageContent.className = 'law-chat-bubble-content';
-        messageContent.innerHTML = content;
+        messageContent.innerHTML = ''; // Start empty
         messageElement.appendChild(messageContent);
-        
-        // Create sources container if we have sources
-        if (sources && sources.length > 0) {
-          const sourcesDiv = document.createElement('div');
-          sourcesDiv.className = 'law-chat-recommendations';
-          
-          // Add heading
-          const heading = document.createElement('h4');
-          heading.textContent = 'Sources:';
-          sourcesDiv.appendChild(heading);
-          
-          // Create list for sources
-          const sourceList = document.createElement('ul');
-          sourceList.className = 'law-chat-recommendation-list';
-          
-          // Add each source as a list item
-          sources.slice(0, 3).forEach(source => {
-            const listItem = document.createElement('li');
-            
-            if (source.url) {
-              const link = document.createElement('a');
-              link.className = 'law-chat-recommendation-link';
-              link.href = source.url;
-              link.textContent = source.title || 'Source';
-              link.target = '_blank';
-              listItem.appendChild(link);
-            } else {
-              listItem.textContent = source.title || 'Source';
-            }
-            
-            sourceList.appendChild(listItem);
-          });
-          
-          sourcesDiv.appendChild(sourceList);
-          messageElement.appendChild(sourcesDiv);
-        }
         
         // Add timestamp
         const timeStamp = document.createElement('div');
@@ -1413,12 +1290,194 @@ addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
         DOM.elements.messages.appendChild(messageElement);
         DOM.scrollToBottom();
         
-        // Update chat history
-        ChatFlow.history.push({
-          role: "assistant",
-          content: content
+        // Calculate a much slower typing speed
+        const totalChars = content.length;
+        const minDuration = 4000; // Minimum 4 seconds for very short messages
+        const maxDuration = 12000; // Maximum 12 seconds for very long messages
+        
+        // Scale duration based on content length
+        const targetDuration = Math.min(maxDuration, 
+          minDuration + (totalChars / 10) * 50); // Much slower scaling
+        
+        // Divide content into words for more natural typing
+        const words = content.split(/\s+/);
+        const totalWords = words.length;
+        
+        // Calculate time per word to achieve target duration
+        const timePerWord = targetDuration / totalWords;
+        
+        let displayedWords = 0;
+        
+        const typeNextWord = () => {
+          if (displayedWords >= totalWords) {
+            // Typing complete
+            // IMPORTANT: Only update the chat history here, don't add another message
+            ChatFlow.history.push({
+              role: "assistant",
+              content: content
+            });
+            return;
+          }
+          
+          // Create a container for the new word with fade-in effect
+          const wordSpan = document.createElement('span');
+          wordSpan.className = 'law-chat-typed-word';
+          
+          // Add proper spacing between words
+          if (displayedWords > 0) {
+            wordSpan.textContent = ' ' + words[displayedWords];
+          } else {
+            wordSpan.textContent = words[displayedWords];
+          }
+          
+          wordSpan.style.opacity = '0';
+          
+          // Append the word to the message
+          messageContent.appendChild(wordSpan);
+          
+          // Trigger the fade-in effect
+          setTimeout(() => {
+            wordSpan.style.opacity = '1';
+          }, 10);
+          
+          // Move to next word
+          displayedWords++;
+          
+          // Schedule the next word with more variation for natural effect
+          // Base timing is slower, plus 20-100% random variation
+          const baseDelay = timePerWord;
+          const randomFactor = 0.2 + (Math.random() * 0.8); // 20-100% variation
+          setTimeout(typeNextWord, baseDelay * randomFactor);
+          
+          DOM.scrollToBottom();
+        };
+        
+        // Start the typing effect
+        setTimeout(typeNextWord, 200);
+      }, 300);
+    },
+
+    // Add only recommendations with custom heading
+    addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
+      UI.hideTypingIndicator();
+      
+      // Create message element
+      const messageElement = document.createElement('div');
+      messageElement.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create recommendations container
+      const recommendationsDiv = document.createElement('div');
+      recommendationsDiv.className = 'law-chat-recommendations';
+      
+      // Add custom heading
+      const heading = document.createElement('h4');
+      heading.textContent = headingText || 'Our attorneys wrote these resources for you:';
+      recommendationsDiv.appendChild(heading);
+      
+      // Create list for recommendations
+      const linkList = document.createElement('ul');
+      linkList.className = 'law-chat-recommendation-list';
+      
+      // Add each recommendation
+      recommendations.forEach(rec => {
+        let cleanTitle = rec.title || 'Resource';
+        if (cleanTitle.includes('|')) {
+          cleanTitle = cleanTitle.split('|')[0].trim();
+        }
+        
+        const listItem = document.createElement('li');
+        
+        const link = document.createElement('a');
+        link.className = 'law-chat-recommendation-link';
+        link.href = rec.url || '#';
+        link.textContent = cleanTitle;
+        link.target = '_blank';
+        
+        listItem.appendChild(link);
+        linkList.appendChild(listItem);
+      });
+      
+      recommendationsDiv.appendChild(linkList);
+      messageElement.appendChild(recommendationsDiv);
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = UI.formatTime();
+      messageElement.appendChild(timeStamp);
+      
+      // Add to chat
+      DOM.elements.messages.appendChild(messageElement);
+      DOM.scrollToBottom();
+    },
+
+    // Add message with sources from DocsBots
+    addMessageWithSources(content, sources) {
+      UI.hideTypingIndicator();
+      
+      // Create the message element
+      const messageElement = document.createElement('div');
+      messageElement.className = 'law-chat-message law-chat-message-bot';
+      
+      // Add content
+      let messageContent = document.createElement('div');
+      messageContent.className = 'law-chat-bubble-content';
+      messageContent.innerHTML = content;
+      messageElement.appendChild(messageContent);
+      
+      // Create sources container if we have sources
+      if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'law-chat-recommendations';
+        
+        // Add heading
+        const heading = document.createElement('h4');
+        heading.textContent = 'Sources:';
+        sourcesDiv.appendChild(heading);
+        
+        // Create list for sources
+        const sourceList = document.createElement('ul');
+        sourceList.className = 'law-chat-recommendation-list';
+        
+        // Add each source as a list item
+        sources.slice(0, 3).forEach(source => {
+          const listItem = document.createElement('li');
+          
+          if (source.url) {
+            const link = document.createElement('a');
+            link.className = 'law-chat-recommendation-link';
+            link.href = source.url;
+            link.textContent = source.title || 'Source';
+            link.target = '_blank';
+            listItem.appendChild(link);
+          } else {
+            listItem.textContent = source.title || 'Source';
+          }
+          
+          sourceList.appendChild(listItem);
         });
-      },
+        
+        sourcesDiv.appendChild(sourceList);
+        messageElement.appendChild(sourcesDiv);
+      }
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = UI.formatTime();
+      messageElement.appendChild(timeStamp);
+      
+      // Add to chat
+      DOM.elements.messages.appendChild(messageElement);
+      DOM.scrollToBottom();
+      
+      // Update chat history
+      ChatFlow.history.push({
+        role: "assistant",
+        content: content
+      });
+    },
+    
     // Add a message to the chat
     addMessage(content, isUser, options = null) {
       // For user messages, add immediately
@@ -1586,61 +1645,60 @@ addOnlyRecommendationsWithCustomHeading(recommendations, headingText) {
     },
     
     // Add only recommendations without content
-    // Make sure the Messages.addOnlyRecommendations method looks like this:
-addOnlyRecommendations(recommendations) {
-  UI.hideTypingIndicator();
-  
-  // Create message element
-  const messageElement = document.createElement('div');
-  messageElement.className = 'law-chat-message law-chat-message-bot';
-  
-  // Create recommendations container
-  const recommendationsDiv = document.createElement('div');
-  recommendationsDiv.className = 'law-chat-recommendations';
-  
-  // Add heading
-  const heading = document.createElement('h4');
-  heading.textContent = 'Our attorneys wrote these resources for you:';
-  recommendationsDiv.appendChild(heading);
-  
-  // Create list for recommendations
-  const linkList = document.createElement('ul');
-  linkList.className = 'law-chat-recommendation-list';
-  
-  // Add each recommendation
-  recommendations.forEach(rec => {
-    let cleanTitle = rec.title || 'Resource';
-    if (cleanTitle.includes('|')) {
-      cleanTitle = cleanTitle.split('|')[0].trim();
-    }
-    
-    const listItem = document.createElement('li');
-    
-    const link = document.createElement('a');
-    link.className = 'law-chat-recommendation-link';
-    link.href = rec.url || '#';
-    link.textContent = cleanTitle;
-    link.target = '_blank';
-    
-    listItem.appendChild(link);
-    linkList.appendChild(listItem);
-  });
-  
-  recommendationsDiv.appendChild(linkList);
-  messageElement.appendChild(recommendationsDiv);
-  
-  // Add timestamp
-  const timeStamp = document.createElement('div');
-  timeStamp.className = 'law-chat-time';
-  timeStamp.textContent = UI.formatTime();
-  messageElement.appendChild(timeStamp);
-  
-  // Add to chat
-  DOM.elements.messages.appendChild(messageElement);
-  DOM.scrollToBottom();
-},
+    addOnlyRecommendations(recommendations) {
+      UI.hideTypingIndicator();
+      
+      // Create message element
+      const messageElement = document.createElement('div');
+      messageElement.className = 'law-chat-message law-chat-message-bot';
+      
+      // Create recommendations container
+      const recommendationsDiv = document.createElement('div');
+      recommendationsDiv.className = 'law-chat-recommendations';
+      
+      // Add heading
+      const heading = document.createElement('h4');
+      heading.textContent = 'Our attorneys wrote these resources for you:';
+      recommendationsDiv.appendChild(heading);
+      
+      // Create list for recommendations
+      const linkList = document.createElement('ul');
+      linkList.className = 'law-chat-recommendation-list';
+      
+      // Add each recommendation
+      recommendations.forEach(rec => {
+        let cleanTitle = rec.title || 'Resource';
+        if (cleanTitle.includes('|')) {
+          cleanTitle = cleanTitle.split('|')[0].trim();
+        }
+        
+        const listItem = document.createElement('li');
+        
+        const link = document.createElement('a');
+        link.className = 'law-chat-recommendation-link';
+        link.href = rec.url || '#';
+        link.textContent = cleanTitle;
+        link.target = '_blank';
+        
+        listItem.appendChild(link);
+        linkList.appendChild(listItem);
+      });
+      
+      recommendationsDiv.appendChild(linkList);
+      messageElement.appendChild(recommendationsDiv);
+      
+      // Add timestamp
+      const timeStamp = document.createElement('div');
+      timeStamp.className = 'law-chat-time';
+      timeStamp.textContent = UI.formatTime();
+      messageElement.appendChild(timeStamp);
+      
+      // Add to chat
+      DOM.elements.messages.appendChild(messageElement);
+      DOM.scrollToBottom();
+    },
 
-    // Add to Messages module
+    // Add disclaimer message
     addDisclaimerMessage() {
       const message = "Utilizing this chat service does not create an attorney-client relationship. Because there is not an attorney-client relationship, the chat service is not confidential or privileged. Any information communicated in this chat is not legal advice. Some of the responses may utilize AI based on the content of our website. Do you agree?";
       
@@ -1651,7 +1709,6 @@ addOnlyRecommendations(recommendations) {
     },
 
     // Disable options and inputs for completed steps
-    // Revise this method in the Messages module
     disableCompletedOptions() {
       // Only disable options from previous conversation stages
       const currentStage = ChatFlow.stage;
@@ -1813,39 +1870,37 @@ addOnlyRecommendations(recommendations) {
         });
         
         // Handle form submission
-        // Update the name input form submission handler
-      // Update in the createNameInputForm method
-      submitButton.addEventListener('click', () => {
-        const name = nameInput.value.trim();
-        
-        // Store name
-        ChatFlow.userName = name;
-        
-        // Disable the name input and button
-        nameInput.disabled = true;
-        nameInput.classList.add('completed');
-        submitButton.disabled = true;
-        submitButton.classList.add('completed');
-        
-        // Add as user message
-        this.addMessage(`My name is ${name}`, true);
-        
-        // Update flow state to phone collection
-        ChatFlow.stage = 'phone-collection';
-        
-        // Show typing indicator before showing phone form
-        UI.showTypingIndicator();
-        
-        // Use setTimeout to simulate typing delay
-        setTimeout(() => {
-          // Hide typing indicator
-          UI.hideTypingIndicator();
+        submitButton.addEventListener('click', () => {
+          const name = nameInput.value.trim();
           
-          // Show phone collection form
-          const isReferral = ChatFlow.userLocation === 'other';
-          this.createPhoneInputForm(isReferral);
-        }, UI.getRandomDelay()); // Use a random delay from the UI module for consistency
-      });
+          // Store name
+          ChatFlow.userName = name;
+          
+          // Disable the name input and button
+          nameInput.disabled = true;
+          nameInput.classList.add('completed');
+          submitButton.disabled = true;
+          submitButton.classList.add('completed');
+          
+          // Add as user message
+          this.addMessage(`My name is ${name}`, true);
+          
+          // Update flow state to phone collection
+          ChatFlow.stage = 'phone-collection';
+          
+          // Show typing indicator before showing phone form
+          UI.showTypingIndicator();
+          
+          // Use setTimeout to simulate typing delay
+          setTimeout(() => {
+            // Hide typing indicator
+            UI.hideTypingIndicator();
+            
+            // Show phone collection form
+            const isReferral = ChatFlow.userLocation === 'other';
+            this.createPhoneInputForm(isReferral);
+          }, UI.getRandomDelay()); // Use a random delay from the UI module for consistency
+        });
       }, 100);
     },
     
@@ -1957,10 +2012,7 @@ addOnlyRecommendations(recommendations) {
         });
         
         // Handle form submission
-        // Inside the createPhoneInputForm method, modify the submit button event listener:
-        // Update the phone form submission handler
-        // Update in the createPhoneInputForm method, in the submit button event listener
-        submitButton.addEventListener('click', () => {
+        submitButton.addEventListener('click', async () => {
           const phoneNumber = `(${areaCodeInput.value}) ${prefixInput.value}-${lineInput.value}`;
           
           // Disable all phone inputs and button
@@ -1972,7 +2024,7 @@ addOnlyRecommendations(recommendations) {
           submitButton.classList.add('completed');
           
           // Submit phone to server
-          API.submitPhoneNumber(phoneNumber, isReferral);
+          await API.submitPhoneNumber(phoneNumber, isReferral);
           
           // Add as user message
           this.addMessage(`My phone number is ${phoneNumber}`, true);
@@ -2029,49 +2081,53 @@ addOnlyRecommendations(recommendations) {
     },
     
 
-// ChatFlow.handleUserMessage modification
-handleUserMessage(message) {
-  console.log("Handling user message:", message, "Stage:", this.stage);
-  
-  // Add message to UI
-  Messages.addMessage(message, true);
-  
-  // Process based on current stage
-  if (this.stage === 'qualified') {
-    console.log("User is qualified, handling message");
-    
-    // Check if this is the first message after qualification (case description)
-    if (!this.caseDetailsProvided) {
-      console.log("First case details - sending directly to DocsBots API");
-      this.caseDetailsProvided = true;
+    // ChatFlow.handleUserMessage modification
+    handleUserMessage(message) {
+      console.log("Handling user message:", message, "Stage:", this.stage);
       
-      // Send directly to DocsBots API instead of showing static recommendations
-      API.sendMessageToDocsBot(message);
-    } else {
-      console.log("Regular conversation - sending to DocsBots");
-      // For all subsequent messages, use the API
-      API.sendMessageToDocsBot(message);
-    }
-  } else if (this.stage === 'initial') {
-    // User hasn't selected case type yet
-    Messages.addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
-      { value: 'personal-injury', text: 'Personal Injury' },
-      { value: 'criminal-defense', text: 'Criminal Defense' },
-      { value: 'divorce', text: 'Divorce' }
-    ]);
-  } else if (this.stage === 'caseType') {
-    // User hasn't selected location yet
-    Messages.addMessage("Thank you. Before we continue, please let me know if your case is in Kansas or Missouri:", false, [
-      { value: 'kansas', text: 'Kansas' },
-      { value: 'missouri', text: 'Missouri' },
-      { value: 'other', text: 'Other State' }
-    ]);
-  }
-},
+      // Add message to UI
+      Messages.addMessage(message, true);
+      
+      // Process based on current stage
+      if (this.stage === 'qualified') {
+        console.log("User is qualified, handling message");
+        
+        // Check if this is the first message after qualification (case description)
+        if (!this.caseDetailsProvided) {
+          console.log("First case details - sending directly to server API");
+          this.caseDetailsProvided = true;
+          
+          // Send directly to server API instead of showing static recommendations
+          API.sendMessageToDocsBot(message);
+        } else {
+          console.log("Regular conversation - sending to server API");
+          // For all subsequent messages, use the server API
+          API.sendMessageToDocsBot(message);
+        }
+      } else if (this.stage === 'initial') {
+        // User hasn't selected case type yet
+        Messages.addMessage("I understand you may have specific questions. To better assist you, please select the type of case you need help with from the options below:", false, [
+          { value: 'personal-injury', text: 'Personal Injury' },
+          { value: 'criminal-defense', text: 'Criminal Defense' },
+          { value: 'divorce', text: 'Divorce' }
+        ]);
+      } else if (this.stage === 'caseType') {
+        // User hasn't selected location yet
+        Messages.addMessage("Thank you. Before we continue, please let me know if your case is in Kansas or Missouri:", false, [
+          { value: 'kansas', text: 'Kansas' },
+          { value: 'missouri', text: 'Missouri' },
+          { value: 'other', text: 'Other State' }
+        ]);
+      }
+    },
     
     // Process option button selection
-    // Modify the handleOptionSelection method
     handleOptionSelection(value, text) {
+      // Warm the server on first option selection (case type selection)
+      if (this.stage === 'initial' && !ServerWarming.isWarmed) {
+        ServerWarming.warmServer();
+      }
+      
       // Store the selected option without disabling anything yet
       const selectedOption = event?.target || document.querySelector(`.law-chat-option[data-value="${value}"]`);
       if (selectedOption) {
@@ -2146,8 +2202,7 @@ handleUserMessage(message) {
         setTimeout(() => {
           this.disablePreviousOptions(selectedOption);
         }, 100);
-      } // Update this part in ChatFlow.handleOptionSelection
-      else if (this.stage === 'disclaimer') {
+      } else if (this.stage === 'disclaimer') {
         if (value === 'agree') {
           // User agreed to disclaimer, now they're qualified
           this.stage = 'qualified';
@@ -2167,7 +2222,6 @@ handleUserMessage(message) {
     },
     
     // Create a natural-sounding message based on option selection
-    // Add this to the createNaturalResponse method in ChatFlow
     createNaturalResponse(value, text) {
       if (this.stage === 'initial') {
         return `I need help with a ${text} case.`;
@@ -2207,590 +2261,431 @@ handleUserMessage(message) {
     }
   };
   
-  // API Module - handles all API calls to external services
-// Replace the previous API implementation with these methods
-const API = {
-  shownSourceUrls: new Set(),
-  firstRecommendationShown: false,
-  // Method to get resources for the first case description
-  async getResourcesForCase(message) {
-  UI.showTypingIndicator();
-  const startTime = Date.now();
-  
-  try {
-    // Generate a conversationId if not exists
-    if (!ChatFlow.conversationId) {
-      ChatFlow.conversationId = this.generateUUID();
-    }
+  // API Module - handles all server-side API calls
+  const API = {
+    shownSourceUrls: new Set(),
+    firstRecommendationShown: false,
     
-    // DocsBots API Request for resources
-    const requestBody = {
-      conversationId: ChatFlow.conversationId,
-      question: message,
-      metadata: { 
-        name: ChatFlow.userName || "Visitor", 
-        caseType: ChatFlow.userCaseType || "",
-        location: ChatFlow.userLocation || "" 
-      },
-      context_items: 5,
-      human_escalation: false,
-      followup_rating: false,
-      document_retriever: true,
-      full_source: true, // Get full source content
-      stream: false // Don't stream for resource lookup
-    };
-    
-    // Make the API request to DocsBots
-    const response = await fetch(`https://api.docsbot.ai/teams/${Config.docsbot.teamId}/bots/${Config.docsbot.botId}/chat-agent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Config.docsbot.apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`DocsBots API error: ${response.status}`);
-    }
-    
-    const responseData = await response.json();
-    UI.hideTypingIndicator();
-    
-    // Extract sources from the response - handle both array and object response formats
-    let sources = [];
-    if (Array.isArray(responseData)) {
-      // If responseData is an array, iterate through it
-      for (const event of responseData) {
-        if (event.event === 'lookup_answer' && event.data && event.data.sources) {
-          sources = event.data.sources;
-          break;
-        }
-      }
-    } else if (typeof responseData === 'object' && responseData !== null) {
-      // If responseData is an object, check if it has a data property with sources
-      if (responseData.data && responseData.data.sources) {
-        sources = responseData.data.sources;
-      } else if (responseData.sources) {
-        sources = responseData.sources;
-      }
-    }
-    
-    // Convert sources to recommendations format
-    if (sources && sources.length > 0) {
-      const recommendations = sources.slice(0, 3).map(source => ({
-        title: source.title || "Resource",
-        url: source.url || "#",
-        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
-        category: ChatFlow.userCaseType || "Legal"
-      }));
+    // Method to get resources for the first case description
+    async getResourcesForCase(message) {
+      UI.showTypingIndicator();
+      const startTime = Date.now();
       
-      // Display recommendations
-      if (recommendations.length > 0) {
-        Messages.addOnlyRecommendations(recommendations);
-        UI.recommendationsShown = true;
-      }
-    } else {
-      // Fallback to dummy recommendations if no sources
-      const fallbackRecommendations = this.getDummyRecommendations(message);
-      if (fallbackRecommendations.length > 0) {
-        Messages.addOnlyRecommendations(fallbackRecommendations);
-        UI.recommendationsShown = true;
-      }
-    }
-    
-    // Add transition message after showing resources
-    setTimeout(() => {
-      const transitionMessage = "Thanks for sharing details about your case. Above are some resources we've written that might be helpful. It's always best to talk with one of our attorneys who can give advice tailored to your specific situation. We'd be happy to give you a call to discuss this further. In the meantime, feel free to ask me any questions, and I'll answer them!";
-      Messages.addMessage(transitionMessage, false);
-      
-      // Update history with user message and transition message
-      ChatFlow.history.push({ role: "user", content: message });
-      ChatFlow.history.push({ role: "assistant", content: transitionMessage });
-    }, 1000);
-    
-    UI.apiLatency = Date.now() - startTime;
-  } catch (error) {
-    console.error("Error fetching resources:", error);
-    UI.apiLatency = Date.now() - startTime;
-    UI.hideTypingIndicator();
-    
-    // Fallback to dummy recommendations
-    const fallbackRecommendations = this.getDummyRecommendations(message);
-    if (fallbackRecommendations.length > 0) {
-      Messages.addOnlyRecommendations(fallbackRecommendations);
-    }
-    
-    // Add transition message
-    setTimeout(() => {
-      const transitionMessage = "Thanks for sharing details about your case. I've included some resources that might be helpful. Feel free to ask me any questions, and I'll do my best to assist you.";
-      Messages.addMessage(transitionMessage, false);
-      
-      // Update history
-      ChatFlow.history.push({ role: "user", content: message });
-      ChatFlow.history.push({ role: "assistant", content: transitionMessage });
-    }, 1000);
-  }
-},
-  
-  // Method to handle normal conversation with DocsBots
-// Completely replace the API.sendMessageToDocsBot method with this basic implementation
-async sendMessageToDocsBot(message) {
-  console.log("Sending message to DocsBots:", message);
-  UI.showTypingIndicator();
-  
-  try {
-    // Generate a conversationId if not exists
-    if (!ChatFlow.conversationId) {
-      ChatFlow.conversationId = this.generateUUID();
-      console.log("Generated new conversation ID:", ChatFlow.conversationId);
-    }
-    
-    // Check if this is the first message after qualification
-    const isFirstMessage = ChatFlow.caseDetailsProvided && 
-                         (!ChatFlow.history.some(item => item.role === "assistant" && 
-                                               item.content !== "Thank you. Could you tell me a little bit about your case?"));
-    
-    // Prepare conversation history for the API in the format it expects
-    // Most LLM APIs expect a messages array with role and content
-    const conversationHistory = ChatFlow.history.map(item => ({
-      role: item.role,
-      content: item.content
-    }));
-    
-    // Enhance metadata for better context
-    const enhancedMetadata = { 
-      name: ChatFlow.userName || "Visitor",
-      caseType: ChatFlow.userCaseType || "",
-      location: ChatFlow.userLocation || "",
-      isFirstContact: isFirstMessage
-    };
-    
-    console.log("Is first detailed message:", isFirstMessage);
-    console.log("Sending conversation history of length:", conversationHistory.length);
-    
-    // DocsBots API Request
-    const requestBody = {
-      conversationId: ChatFlow.conversationId,
-      question: message,
-      conversation_history: conversationHistory,  // Add full conversation history
-      metadata: enhancedMetadata,
-      context_items: isFirstMessage ? 5 : 3, // Retrieve more context for first message
-      human_escalation: false,
-      followup_rating: false,
-      document_retriever: true,
-      full_source: true,
-      stream: false
-    };
-    
-    console.log("DocsBots request payload:", requestBody);
-    
-    // Make the API request to DocsBots
-    const response = await fetch(`https://api.docsbot.ai/teams/${Config.docsbot.teamId}/bots/${Config.docsbot.botId}/chat-agent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Config.docsbot.apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    console.log("DocsBots response status:", response.status);
-    
-    // If response is not OK, fall back
-    if (!response.ok) {
-      console.error("DocsBots API error:", response.status, response.statusText);
-      throw new Error(`DocsBots API error: ${response.status}`);
-    }
-    
-    const responseText = await response.text();
-    console.log("DocsBots raw response:", responseText);
-    
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Failed to parse DocsBots response as JSON:", e);
-      throw new Error("Invalid response format");
-    }
-    
-    console.log("DocsBots parsed response:", responseData);
-    
-    UI.hideTypingIndicator();
-    
-    // Extract answer and sources from response
-let answer = null;
-let sources = [];
-
-// Try multiple approaches to find the answer and sources in the response
-if (Array.isArray(responseData)) {
-  console.log("Processing array response");
-  // Find the lookup_answer event
-  for (const event of responseData) {
-    console.log("Processing event:", event);
-    if (event && event.event === 'lookup_answer' && event.data) {
-      if (event.data.answer) {
-        answer = event.data.answer;
-        console.log("Found answer in lookup_answer event:", answer);
-      }
-      
-      // Extract sources from the response
-      if (event.data.sources && Array.isArray(event.data.sources)) {
-        sources = event.data.sources;
-        console.log("Found sources in lookup_answer event:", sources);
-      }
-    }
-  }
-} else if (responseData && typeof responseData === 'object') {
-  console.log("Processing object response");
-  // Look for answer in various places
-  if (responseData.data && responseData.data.answer) {
-    answer = responseData.data.answer;
-    console.log("Found answer in responseData.data.answer:", answer);
-    
-    // Also check for sources here
-    if (responseData.data.sources && Array.isArray(responseData.data.sources)) {
-      sources = responseData.data.sources;
-      console.log("Found sources in responseData.data.sources:", sources);
-    }
-  } else if (responseData.answer) {
-    answer = responseData.answer;
-    console.log("Found answer in responseData.answer:", answer);
-    
-    // Also check for sources here
-    if (responseData.sources && Array.isArray(responseData.sources)) {
-      sources = responseData.sources;
-      console.log("Found sources in responseData.sources:", sources);
-    }
-  }
-}
-    
-    // If no answer found, use generic fallback
-    if (!answer) {
-      console.warn("No answer found in DocsBots response");
-      answer = "I'm sorry, but I don't have enough information to answer that question specifically. Our attorneys would be happy to discuss this during a consultation. Please call us at (913) 451-9500.";
-    }
-    
-    console.log("Final answer to display:", answer);
-console.log("Sources found:", sources ? sources.length : 0);
-
-// Process and deduplicate sources
-let uniqueSources = [];
-let allSourcesAlreadyShown = true; // Flag to track if all sources have been shown before
-
-if (sources && sources.length > 0) {
-  // Create a map to track seen URLs to help with deduplication for this response
-  const seenUrls = new Map();
-  
-  // Process each source
-  sources.forEach(source => {
-    const url = source.url || "";
-    // Skip if we've seen this URL before in this response or if it's empty
-    if (!seenUrls.has(url) && url && url.trim() !== "") {
-      seenUrls.set(url, true);
-      
-      // Check if this source has been shown to the user before
-      const isNewSource = !API.shownSourceUrls.has(url);
-      if (isNewSource) {
-        allSourcesAlreadyShown = false; // At least one new source
-      }
-      
-      uniqueSources.push({
-        title: source.title || "Resource",
-        url: url,
-        snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
-        category: ChatFlow.userCaseType || "Legal",
-        isNew: isNewSource
-      });
-    }
-  });
-  
-  // Filter to only include new sources if there are any
-  const newSources = uniqueSources.filter(source => source.isNew);
-  
-  // If we have new sources, use those, otherwise keep all (up to 2)
-  uniqueSources = newSources.length > 0 ? newSources : uniqueSources;
-  
-  // Limit to top 2 unique sources
-  uniqueSources = uniqueSources.slice(0, 2);
-  
-  // Mark these sources as shown for future reference
-  uniqueSources.forEach(source => {
-    API.shownSourceUrls.add(source.url);
-  });
-  
-  console.log("Unique sources to display:", uniqueSources);
-}
-
-if (uniqueSources && uniqueSources.length > 0 && !allSourcesAlreadyShown) {
-  console.log("Adding recommendations bubble with sources:", uniqueSources);
-  
-  // Determine the appropriate heading
-  let headingText;
-  if (!API.firstRecommendationShown) {
-    headingText = "Our attorneys wrote these resources for you:";
-    API.firstRecommendationShown = true;
-  } else {
-    headingText = "Based on the conversation, this resource may be tailored to you too:";
-  }
-  
-  // Add the recommendations immediately
-  Messages.addOnlyRecommendationsWithCustomHeading(uniqueSources, headingText);
-  
-  // Short delay before starting the typing effect of the main response
-  setTimeout(() => {
-    // Add the answer to the chat with typing effect
-    Messages.addMessageWithTypingEffect(answer, false);
-  }, 300);
-} else {
-  // No recommendations to show, just add the answer with typing effect
-  Messages.addMessageWithTypingEffect(answer, false);
-}
-
-// Only update user message in chat history, the bot response is updated in the typing effect
-ChatFlow.history.push({ role: "user", content: message });
-    
-  } catch (error) {
-    console.error("Error in sendMessageToDocsBot:", error);
-    UI.hideTypingIndicator();
-    
-    // Simple fallback
-    const fallback = "I apologize, but I'm having trouble connecting to our knowledge base at the moment. For immediate assistance, please call our office at (913) 451-9500.";
-    Messages.addMessage(fallback, false);
-    
-    // Update conversation history
-    ChatFlow.history.push({ role: "user", content: message });
-    ChatFlow.history.push({ role: "assistant", content: fallback });
-  }
-},
-  
-  // Streaming response container implementation
-  createStreamingResponseContainer() {
-  UI.hideTypingIndicator();
-  
-  // Create the message element
-  const messageElement = document.createElement('div');
-  messageElement.className = 'law-chat-message law-chat-message-bot';
-  
-  // Create message content container
-  const messageContent = document.createElement('div');
-  messageContent.className = 'law-chat-bubble-content';
-  messageContent.textContent = 'Thinking...'; // Start with a placeholder
-  
-  // Add timestamp
-  const timeStamp = document.createElement('div');
-  timeStamp.className = 'law-chat-time';
-  timeStamp.textContent = UI.formatTime();
-  
-  // Assemble the message
-  messageElement.appendChild(messageContent);
-  messageElement.appendChild(timeStamp);
-  
-  // Add to chat
-  DOM.elements.messages.appendChild(messageElement);
-  DOM.scrollToBottom();
-  
-  return {
-    // Update content as chunks arrive
-    updateContent: (text) => {
-      if (!text || !text.trim()) {
-        text = "I'm processing your question...";
-      }
-      
-      // Convert markdown to HTML if needed
       try {
-        // Simple markdown to HTML conversion for basic formatting
-        const formattedText = text
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>')
-          .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>')
-          .replace(/\n\n/g, '<br><br>')
-          .replace(/\n/g, '<br>');
+        // Generate a conversationId if not exists
+        if (!ChatFlow.conversationId) {
+          ChatFlow.conversationId = this.generateUUID();
+        }
         
-        messageContent.innerHTML = formattedText;
-      } catch (e) {
-        // Fallback to plain text if markdown conversion fails
-        messageContent.textContent = text;
+        // Prepare form data for server
+        const formData = new URLSearchParams();
+        formData.append('conversation_id', ChatFlow.conversationId);
+        formData.append('question', message);
+        formData.append('metadata', JSON.stringify({ 
+          name: ChatFlow.userName || "Visitor", 
+          caseType: ChatFlow.userCaseType || "",
+          location: ChatFlow.userLocation || "" 
+        }));
+        formData.append('context_items', '5');
+        
+        console.log('Sending to get-resources endpoint:', Object.fromEntries(formData));
+        
+        // Make request to server
+        const response = await fetch(`${Config.serverUrl}/get-resources`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        const responseData = await response.json();
+        console.log('Server response:', responseData);
+        
+        UI.hideTypingIndicator();
+        
+        // Extract sources from the response
+        let sources = [];
+        if (responseData.status === 'success' && responseData.data) {
+          if (Array.isArray(responseData.data)) {
+            // Handle array response format
+            for (const event of responseData.data) {
+              if (event.event === 'lookup_answer' && event.data && event.data.sources) {
+                sources = event.data.sources;
+                break;
+              }
+            }
+          } else if (responseData.data.sources) {
+            sources = responseData.data.sources;
+          }
+        }
+        
+        // Convert sources to recommendations format
+        if (sources && sources.length > 0) {
+          const recommendations = sources.slice(0, 3).map(source => ({
+            title: source.title || "Resource",
+            url: source.url || "#",
+            snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
+            category: ChatFlow.userCaseType || "Legal"
+          }));
+          
+          // Display recommendations
+          if (recommendations.length > 0) {
+            Messages.addOnlyRecommendations(recommendations);
+            UI.recommendationsShown = true;
+          }
+        } else {
+          // Fallback to dummy recommendations if no sources
+          const fallbackRecommendations = this.getDummyRecommendations(message);
+          if (fallbackRecommendations.length > 0) {
+            Messages.addOnlyRecommendations(fallbackRecommendations);
+            UI.recommendationsShown = true;
+          }
+        }
+        
+        // Add transition message after showing resources
+        setTimeout(() => {
+          const transitionMessage = "Thanks for sharing details about your case. Above are some resources we've written that might be helpful. It's always best to talk with one of our attorneys who can give advice tailored to your specific situation. We'd be happy to give you a call to discuss this further. In the meantime, feel free to ask me any questions, and I'll answer them!";
+          Messages.addMessage(transitionMessage, false);
+          
+          // Update history with user message and transition message
+          ChatFlow.history.push({ role: "user", content: message });
+          ChatFlow.history.push({ role: "assistant", content: transitionMessage });
+        }, 1000);
+        
+        UI.apiLatency = Date.now() - startTime;
+      } catch (error) {
+        console.error("Error fetching resources:", error);
+        UI.apiLatency = Date.now() - startTime;
+        UI.hideTypingIndicator();
+        
+        // Show graceful error message
+        const errorMessage = "I'm sorry, but I'm having trouble accessing our knowledge base at the moment. For immediate assistance, please call our office at (913) 451-9500.";
+        Messages.addMessage(errorMessage, false);
+        
+        // Update history
+        ChatFlow.history.push({ role: "user", content: message });
+        ChatFlow.history.push({ role: "assistant", content: errorMessage });
       }
-      DOM.scrollToBottom();
     },
     
-    // Finalize message when done
-    finalize: () => {
-      // Check if the content is still empty or just the placeholder
-      if (!messageContent.textContent.trim() || 
-          messageContent.textContent === 'Thinking...' ||
-          messageContent.textContent === "I'm processing your question...") {
-        messageContent.innerHTML = "I'm sorry, but I couldn't find specific information about that in our knowledge base. For questions about criminal charges, it's best to speak directly with one of our attorneys. Please call us at (913) 451-9500 for a confidential consultation.";
+    // Method to handle normal conversation with server
+    async sendMessageToDocsBot(message) {
+      console.log("Sending message to server:", message);
+      UI.showTypingIndicator();
+      
+      try {
+        // Generate a conversationId if not exists
+        if (!ChatFlow.conversationId) {
+          ChatFlow.conversationId = this.generateUUID();
+          console.log("Generated new conversation ID:", ChatFlow.conversationId);
+        }
+        
+        // Check if this is the first message after qualification
+        const isFirstMessage = ChatFlow.caseDetailsProvided && 
+                             (!ChatFlow.history.some(item => item.role === "assistant" && 
+                                                   item.content !== "Thank you. Could you tell me a little bit about your case?"));
+        
+        // Prepare conversation history for the server
+        const conversationHistory = ChatFlow.history.map(item => ({
+          role: item.role,
+          content: item.content
+        }));
+        
+        // Enhance metadata for better context
+        const enhancedMetadata = { 
+          name: ChatFlow.userName || "Visitor",
+          caseType: ChatFlow.userCaseType || "",
+          location: ChatFlow.userLocation || "",
+          isFirstContact: isFirstMessage
+        };
+        
+        console.log("Is first detailed message:", isFirstMessage);
+        console.log("Sending conversation history of length:", conversationHistory.length);
+        
+        // Prepare form data for server
+        const formData = new URLSearchParams();
+        formData.append('conversation_id', ChatFlow.conversationId);
+        formData.append('question', message);
+        formData.append('conversation_history', JSON.stringify(conversationHistory));
+        formData.append('metadata', JSON.stringify(enhancedMetadata));
+        formData.append('context_items', isFirstMessage ? '5' : '3');
+        formData.append('full_source', 'true');
+        
+        console.log("Server request payload:", Object.fromEntries(formData));
+        
+        // Make request to server
+        const response = await fetch(`${Config.serverUrl}/chat-docsbot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData,
+        });
+        
+        console.log("Server response status:", response.status);
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        const responseData = await response.json();
+        console.log("Server parsed response:", responseData);
+        
+        UI.hideTypingIndicator();
+        
+        // Extract answer and sources from server response
+        let answer = null;
+        let sources = [];
+        
+        if (responseData.status === 'success' && responseData.data) {
+          if (Array.isArray(responseData.data)) {
+            console.log("Processing array response");
+            // Find the lookup_answer event
+            for (const event of responseData.data) {
+              console.log("Processing event:", event);
+              if (event && event.event === 'lookup_answer' && event.data) {
+                if (event.data.answer) {
+                  answer = event.data.answer;
+                  console.log("Found answer in lookup_answer event:", answer);
+                }
+                
+                // Extract sources from the response
+                if (event.data.sources && Array.isArray(event.data.sources)) {
+                  sources = event.data.sources;
+                  console.log("Found sources in lookup_answer event:", sources);
+                }
+              }
+            }
+          } else if (responseData.data && typeof responseData.data === 'object') {
+            console.log("Processing object response");
+            // Look for answer in various places
+            if (responseData.data.answer) {
+              answer = responseData.data.answer;
+              console.log("Found answer in responseData.data.answer:", answer);
+              
+              // Also check for sources here
+              if (responseData.data.sources && Array.isArray(responseData.data.sources)) {
+                sources = responseData.data.sources;
+                console.log("Found sources in responseData.data.sources:", sources);
+              }
+            }
+          }
+        }
+        
+        // If no answer found, use generic fallback
+        if (!answer) {
+          console.warn("No answer found in server response");
+          answer = "I'm sorry, but I don't have enough information to answer that question specifically. Our attorneys would be happy to discuss this during a consultation. Please call us at (913) 451-9500.";
+        }
+        
+        console.log("Final answer to display:", answer);
+        console.log("Sources found:", sources ? sources.length : 0);
+
+        // Process and deduplicate sources
+        let uniqueSources = [];
+        let allSourcesAlreadyShown = true; // Flag to track if all sources have been shown before
+
+        if (sources && sources.length > 0) {
+          // Create a map to track seen URLs to help with deduplication for this response
+          const seenUrls = new Map();
+          
+          // Process each source
+          sources.forEach(source => {
+            const url = source.url || "";
+            // Skip if we've seen this URL before in this response or if it's empty
+            if (!seenUrls.has(url) && url && url.trim() !== "") {
+              seenUrls.set(url, true);
+              
+              // Check if this source has been shown to the user before
+              const isNewSource = !API.shownSourceUrls.has(url);
+              if (isNewSource) {
+                allSourcesAlreadyShown = false; // At least one new source
+              }
+              
+              uniqueSources.push({
+                title: source.title || "Resource",
+                url: url,
+                snippet: source.content ? source.content.substring(0, 100) + "..." : "Additional resource",
+                category: ChatFlow.userCaseType || "Legal",
+                isNew: isNewSource
+              });
+            }
+          });
+          
+          // Filter to only include new sources if there are any
+          const newSources = uniqueSources.filter(source => source.isNew);
+          
+          // If we have new sources, use those, otherwise keep all (up to 2)
+          uniqueSources = newSources.length > 0 ? newSources : uniqueSources;
+          
+          // Limit to top 2 unique sources
+          uniqueSources = uniqueSources.slice(0, 2);
+          
+          // Mark these sources as shown for future reference
+          uniqueSources.forEach(source => {
+            API.shownSourceUrls.add(source.url);
+          });
+          
+          console.log("Unique sources to display:", uniqueSources);
+        }
+
+        if (uniqueSources && uniqueSources.length > 0 && !allSourcesAlreadyShown) {
+          console.log("Adding recommendations bubble with sources:", uniqueSources);
+          
+          // Determine the appropriate heading
+          let headingText;
+          if (!API.firstRecommendationShown) {
+            headingText = "Our attorneys wrote these resources for you:";
+            API.firstRecommendationShown = true;
+          } else {
+            headingText = "Based on the conversation, this resource may be tailored to you too:";
+          }
+          
+          // Add the recommendations immediately
+          Messages.addOnlyRecommendationsWithCustomHeading(uniqueSources, headingText);
+          
+          // Short delay before starting the typing effect of the main response
+          setTimeout(() => {
+            // Add the answer to the chat with typing effect
+            Messages.addMessageWithTypingEffect(answer, false);
+          }, 300);
+        } else {
+          // No recommendations to show, just add the answer with typing effect
+          Messages.addMessageWithTypingEffect(answer, false);
+        }
+
+        // Only update user message in chat history, the bot response is updated in the typing effect
+        ChatFlow.history.push({ role: "user", content: message });
+        
+      } catch (error) {
+        console.error("Error in sendMessageToDocsBot:", error);
+        UI.hideTypingIndicator();
+        
+        // Show graceful error message
+        const fallback = "I'm sorry, but I'm having trouble accessing our knowledge base at the moment. For immediate assistance, please call our office at (913) 451-9500.";
+        Messages.addMessage(fallback, false);
+        
+        // Update conversation history
+        ChatFlow.history.push({ role: "user", content: message });
+        ChatFlow.history.push({ role: "assistant", content: fallback });
       }
-      DOM.scrollToBottom();
     },
     
-    // Remove the container entirely
-    remove: () => {
-      if (messageElement.parentNode) {
-        messageElement.parentNode.removeChild(messageElement);
+    // Submit phone number to server
+    async submitPhoneNumber(phoneNumber, isReferral = false) {
+      console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
+      
+      try {
+        // Format case type and location for SMS
+        const caseTypeText = ChatFlow.getCaseTypeDisplay();
+        const locationText = ChatFlow.getLocationDisplay();
+        const nameText = ChatFlow.userName || "Unknown";
+        
+        // Prepare form data for server
+        const formData = new URLSearchParams();
+        formData.append('phone_number', phoneNumber);
+        formData.append('user_name', nameText);
+        formData.append('case_type', caseTypeText);
+        formData.append('location', locationText);
+        formData.append('is_referral', isReferral.toString());
+        
+        console.log('Sending SMS via server:', Object.fromEntries(formData));
+        
+        // Send to server
+        const response = await fetch(`${Config.serverUrl}/send-sms`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData,
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('SMS sent successfully via server:', result);
+        } else {
+          console.error('Server SMS endpoint failed:', response.status);
+          // Continue flow even if SMS fails
+        }
+      } catch (error) {
+        console.error('Error sending SMS via server:', error);
+        // Continue flow even if SMS fails
       }
+      
+      // Ensure send button is enabled after submission
+      setTimeout(() => {
+        DOM.elements.send.disabled = false;
+      }, 500);
+    },
+    
+    // UUID generator
+    generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    },
+    
+    // Fallback recommendations
+    getDummyRecommendations(message) {
+      const lowercaseMessage = message.toLowerCase();
+      
+      // Base set of recommendations that might be relevant
+      const recommendations = [
+        {
+          title: "Car Accident Claims Guide",
+          url: "/car-accident-claims-guide",
+          snippet: "Learn about the steps to take after a car accident and how to maximize your compensation.",
+          category: "Personal Injury"
+        },
+        {
+          title: "Kansas Personal Injury Statute of Limitations",
+          url: "/personal-injury-statute-of-limitations",
+          snippet: "Important time limits for filing personal injury claims in Kansas.",
+          category: "Personal Injury"
+        },
+        {
+          title: "Drunk Driving Accidents: Victim's Rights",
+          url: "/drunk-driving-victim-rights",
+          snippet: "Information about your legal rights when injured by an intoxicated driver.",
+          category: "Personal Injury"
+        }
+      ];
+      
+      // Return a subset of recommendations based on keywords
+      const keywordMap = {
+        "drunk": 2, // Index of drunk driving article
+        "hit": 0,   // Index of car accident guide
+        "accident": 0,
+        "compensation": 0,
+        "time": 1,   // Index of statute of limitations
+        "deadline": 1,
+        "kansas": 1,
+        "missouri": 1
+      };
+      
+      // Check for keywords in the message
+      const matchedIndices = new Set();
+      Object.keys(keywordMap).forEach(keyword => {
+        if (lowercaseMessage.includes(keyword)) {
+          matchedIndices.add(keywordMap[keyword]);
+        }
+      });
+      
+      // If specific keywords were found, return those recommendations
+      if (matchedIndices.size > 0) {
+        return Array.from(matchedIndices).map(index => recommendations[index]);
+      }
+      
+      // If no specific keywords matched, return random 1-2 recommendations
+      return recommendations.slice(0, Math.floor(Math.random() * 2) + 1);
     }
   };
-},
-  
-  // UUID generator
-  generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  },
-  
-  // Fallback recommendations
-  getDummyRecommendations(message) {
-    const lowercaseMessage = message.toLowerCase();
-    
-    // Base set of recommendations that might be relevant
-    const recommendations = [
-      {
-        title: "Car Accident Claims Guide",
-        url: "/car-accident-claims-guide",
-        snippet: "Learn about the steps to take after a car accident and how to maximize your compensation.",
-        category: "Personal Injury"
-      },
-      {
-        title: "Kansas Personal Injury Statute of Limitations",
-        url: "/personal-injury-statute-of-limitations",
-        snippet: "Important time limits for filing personal injury claims in Kansas.",
-        category: "Personal Injury"
-      },
-      {
-        title: "Drunk Driving Accidents: Victim's Rights",
-        url: "/drunk-driving-victim-rights",
-        snippet: "Information about your legal rights when injured by an intoxicated driver.",
-        category: "Personal Injury"
-      }
-    ];
-    
-    // Return a subset of recommendations based on keywords
-    const keywordMap = {
-      "drunk": 2, // Index of drunk driving article
-      "hit": 0,   // Index of car accident guide
-      "accident": 0,
-      "compensation": 0,
-      "time": 1,   // Index of statute of limitations
-      "deadline": 1,
-      "kansas": 1,
-      "missouri": 1
-    };
-    
-    // Check for keywords in the message
-    const matchedIndices = new Set();
-    Object.keys(keywordMap).forEach(keyword => {
-      if (lowercaseMessage.includes(keyword)) {
-        matchedIndices.add(keywordMap[keyword]);
-      }
-    });
-    
-    // If specific keywords were found, return those recommendations
-    if (matchedIndices.size > 0) {
-      return Array.from(matchedIndices).map(index => recommendations[index]);
-    }
-    
-    // If no specific keywords matched, return random 1-2 recommendations
-    return recommendations.slice(0, Math.floor(Math.random() * 2) + 1);
-  },
-  
-  // Process fallback response when API call fails
-  processFallbackResponse(message) {
-  UI.showTypingIndicator();
-  
-  // Default fallback
-  let response = "Thank you for your question. Our team would be happy to provide more specific information during a free consultation. Would you like us to contact you to schedule a time to talk? You can reach us at (913) 451-9500.";
-  
-  // Check message against fallback dictionary
-  const fallbackResponses = {
-    "accident": "If you've been in an accident, your health is the first priority. Seek medical attention right away, even if you feel fine - some injuries aren't immediately apparent. Then, document everything you can about the accident and call us at (913) 451-9500 for a free consultation to discuss your legal options.",
-    "worth": "Every personal injury case is unique. The value depends on factors like medical expenses, lost wages, pain and suffering, and long-term impacts. We offer a free consultation to evaluate your specific situation and give you a better understanding of what compensation you might expect.",
-    "settlement": "Most personal injury cases settle before trial, but we prepare every case as if it will go to court. This approach often leads to better settlement offers. The timeline varies from a few months to over a year depending on case complexity and the extent of your injuries.",
-    "fault": "Kansas follows a modified comparative negligence rule, meaning you can still recover damages even if you were partially at fault, as long as your fault is less than 50%. Your compensation may be reduced by your percentage of fault. We can evaluate your situation during a free consultation.",
-    "fees": "We work on a contingency fee basis, which means you pay nothing upfront, and we only get paid if we win your case. Our fee is typically a percentage of your settlement or verdict. This arrangement allows anyone to access quality legal representation regardless of their financial situation.",
-    "consultation": "We offer a free 30-minute consultation to discuss your case. You can schedule by calling (913) 451-9500. We also offer virtual consultations if that's more convenient for you.",
-    "evidence": "Important evidence in personal injury cases includes medical records, accident reports, witness statements, photographs, video footage, and documentation of lost wages. The sooner you contact us, the better we can help preserve crucial evidence for your case.",
-    "timeline": "Most personal injury cases resolve within 3-12 months, though complex cases can take longer. We work efficiently to reach a resolution while still pursuing maximum compensation for your injuries.",
-    "drug": "Drug charges can have serious consequences, including potential jail time, fines, and a permanent criminal record that may affect your future employment and housing opportunities. The severity depends on the type and quantity of drugs involved, as well as your prior record. We recommend scheduling a confidential consultation with one of our criminal defense attorneys at (913) 451-9500 to discuss your specific situation.",
-    "coke": "Drug possession charges can have serious consequences, even for first-time offenders. The penalties depend on the amount, your prior record, and other factors. Every case is unique, and it's important to get personalized legal advice. Our criminal defense attorneys can evaluate your situation and explain your options during a confidential consultation. Please call us at (913) 451-9500 to discuss your case."
-  };
-  
-  // Check for keywords in the message
-  const lowercaseMessage = message.toLowerCase();
-  Object.keys(fallbackResponses).forEach(key => {
-    if (lowercaseMessage.includes(key)) {
-      response = fallbackResponses[key];
-    }
-  });
-  
-  // Special handling for sensitive criminal matters or drug references
-  if (lowercaseMessage.includes("drugs") || 
-      lowercaseMessage.includes("caught") || 
-      lowercaseMessage.includes("arrest") || 
-      lowercaseMessage.includes("trouble") ||
-      lowercaseMessage.includes("jail") ||
-      lowercaseMessage.includes("prison")) {
-    response = "I understand your concern. Criminal charges can be serious, and the consequences vary based on many factors specific to your situation. For legal issues of this nature, it's best to speak directly with one of our attorneys who can provide confidential guidance. Please call us at (913) 451-9500 to schedule a consultation where we can discuss your case in detail.";
-  }
-  
-  // Add fallback response after delay
-  setTimeout(() => {
-    Messages.addMessage(response, false);
-    
-    // Update conversation history
-    ChatFlow.history.push({ role: "user", content: message });
-    ChatFlow.history.push({ role: "assistant", content: response });
-  }, UI.getRandomDelay(800, 1200));
-},
-  
-// Submit phone number to server/SMS
-submitPhoneNumber(phoneNumber, isReferral = false) {
-  console.log(`Submitting phone number: ${phoneNumber}, Referral: ${isReferral}`);
-  
-  // Format case type and location for SMS
-  const caseTypeText = ChatFlow.getCaseTypeDisplay();
-  const locationText = ChatFlow.getLocationDisplay();
-  const nameText = ChatFlow.userName || "Unknown"; // Get the user's name, default to "Unknown" if not available
-  
-  // Create message body for SMS with name included
-  const messageBody = `Roth Davies Chatbot - New Incoming Client: ${nameText} - ${caseTypeText} case in ${locationText}. Phone: ${phoneNumber}`;
-  
-  // Send SMS via Twilio API
-  fetch(`https://api.twilio.com/2010-04-01/Accounts/${Config.twilio.accountSid}/Messages.json`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + btoa(`${Config.twilio.accountSid}:${Config.twilio.authToken}`)
-    },
-    body: new URLSearchParams({
-      'To': Config.twilio.toNumber,
-      'From': Config.twilio.fromNumber,
-      'Body': messageBody
-    })
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log('Twilio SMS sent successfully:', data);
-  })
-  .catch(error => {
-    console.error('Error sending Twilio SMS:', error);
-    // Continue flow even if SMS fails
-  });
-  
-  // Ensure send button is enabled after submission
-  setTimeout(() => {
-    DOM.elements.send.disabled = false;
-  }, 500);
-}};
   
   // Initialize the application
   DOM.initialize();
