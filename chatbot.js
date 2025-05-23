@@ -10,7 +10,7 @@
 
   const Config = {
     // Server configuration
-    serverUrl: siteConfig.serverUrl || 'https://your-render-app.onrender.com', // Replace with your Render URL
+    serverUrl: siteConfig.serverUrl || 'https://roth-davies-form-server.onrender.com/', // Replace with your Render URL
     
     videos: {
       default: siteConfig.videos?.default || 'https://camrenhall.github.io/ai-chatbot-for-law/videos/welcome.mp4',
